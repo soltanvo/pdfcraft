@@ -1,0 +1,6 @@
+src/app/[locale]/ai-tools/AIToolsClient.tsx(67,8): error TS2741: Property 'locale' is missing in type '{}' but required in type 'FooterProps'.
+src/app/[locale]/credits/page.tsx(13,8): error TS2741: Property 'locale' is missing in type '{}' but required in type 'HeaderProps'.
+src/app/[locale]/credits/page.tsx(21,8): error TS2741: Property 'locale' is missing in type '{}' but required in type 'FooterProps'.
+src/app/[locale]/pricing/PricingPageClient.tsx(28,27): error TS2741: Property 'clientId' is missing in type '{ "client-id": string; currency: string; }' but required in type 'ReactPayPalScriptOptions'.
+src/app/[locale]/pricing/PricingPageClient.tsx(48,44): error TS2322: Type '{ value: string; }' is not assignable to type '{ currency_code: string; value: string; } & { breakdown?: { item_total?: { currency_code: string; value: string; } | undefined; shipping?: { currency_code: string; value: string; } | undefined; ... 4 more ...; discount?: { ...; } | undefined; } | undefined; }'.
+  Property 'currency_code' is missing in type '{ value: string; }' but required in type '{ currency_code: string; value: string; }'.

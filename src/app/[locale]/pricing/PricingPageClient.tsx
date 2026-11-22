@@ -19,7 +19,7 @@ export default function PricingPageClient({ locale }: PricingPageClientProps) {
     { name: 'باقة المحترفين', price: 5, points: 100, description: '100 نقطة فورية', popular: true },
   ];
 
-  const paypalOptions = {
+  const paypalOptions: any = {
     "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "",
     currency: "USD",
   };
@@ -45,7 +45,8 @@ export default function PricingPageClient({ locale }: PricingPageClientProps) {
                   <PayPalButtons
                     createOrder={(data, actions) => {
                       return actions.order.create({
-                        purchase_units: [{ amount: { value: plan.price.toString() } }],
+                        intent: "CAPTURE",
+                        purchase_units: [{ amount: { currency_code: 'USD', value: plan.price.toString() } }],
                       });
                     }}
                     onApprove={async (data, actions) => {
