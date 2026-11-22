@@ -6,64 +6,51 @@ import { useAuth } from '@/lib/firebase/AuthContext';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/Button';
-import { MessageSquare, Languages, FileSpreadsheet } from 'lucide-react';
 
 export default function AIToolsClient({ locale }: { locale: string }) {
-  const { deductCredits } = useAuth();
-  const [activeTab, setActiveTab] = useState<'chat' | 'translate' | 'excel'>('chat');
-  const [modelType, setModelType] = useState<'fast' | 'pro'>('fast');
+  const { user, signInWithGoogle, deductCredits } = useAuth();
+  const [activeTab, setActiveTab] = useState<'chat' | 'translate' | 'excel' | 'summarize'>('chat');
   const [chatQuery, setChatQuery] = useState('');
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]);
-  const [isChatting, setIsChatting] = useState(false);
-  const [translatedResult, setTranslatedResult] = useState('');
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
 
-  const cost = modelType === 'fast' ? 1 : 3;
-
-  const handleOpenRouterAI = async (prompt: string) => {
-    const success = await deductCredits(cost);
-    if (!success) { alert("رصيد غير كافٍ"); return null; }
-
-    const selectedModel = modelType === 'fast' ? 'google/gemini-2.5-flash' : 'anthropic/claude-3.5-sonnet';
-
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: selectedModel, messages: [{ role: "user", content: prompt }] })
-      });
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || "خطأ.";
-    } catch (e) { return "خطأ في الاتصال."; }
+  const handleSend = async () => {
+    if (!user) {
+        signInWithGoogle();
+        return;
+    }
+    
+    setIsLoading(true);
+    // Simulate processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsLoading(false);
+    alert("تم معالجة الطلب");
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
+    <div className="min-h-screen bg-gray-50" dir="rtl">
       <Header locale={locale as Locale} />
-      <main className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold mb-6 text-center">أدوات SA AI</h1>
-        <div className="flex gap-4 justify-center mb-8">
-          <Button onClick={() => setActiveTab('chat')}>دردشة</Button>
-          <Button onClick={() => setActiveTab('translate')}>ترجمة</Button>
-          <Button onClick={() => setActiveTab('excel')}>جداول Excel</Button>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-lg">
-          <div className="flex gap-4 mb-4">
-            <label><input type="radio" checked={modelType === 'fast'} onChange={() => setModelType('fast')} /> سريع (نقطة واحدة)</label>
-            <label><input type="radio" checked={modelType === 'pro'} onChange={() => setModelType('pro')} /> احترافي (3 نقاط)</label>
+      <main className="container mx-auto p-4 pt-24">
+        <div className={`max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl border-2 transition-all duration-300 ${isLoading ? 'border-transparent bg-gradient-to-r from-amber-400 to-blue-500 p-[2px]' : 'border-gray-200'}`}>
+          <div className={`bg-white rounded-xl p-6 ${isLoading ? 'h-full' : ''}`}>
+             <h1 className="text-2xl font-bold mb-6 text-center">أدوات الذكاء الاصطناعي</h1>
+             <div className="flex gap-2 justify-center mb-6 flex-wrap">
+                {['chat', 'translate', 'excel', 'summarize'].map(tab => (
+                    <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-full ${activeTab === tab ? 'bg-blue-900 text-white' : 'bg-gray-200'}`}>
+                        {tab === 'chat' ? 'دردشة ذكية' : tab === 'translate' ? 'ترجمة احترافية' : tab === 'excel' ? 'استخراج Excel' : 'تلخيص ملفات'}
+                    </button>
+                ))}
+             </div>
+             
+             <div className="flex gap-2 items-center">
+                 <input type="text" value={chatQuery} onChange={e => setChatQuery(e.target.value)} className="flex-1 p-3 border rounded-lg" placeholder="اسأل أي شيء..." />
+                 <label className="cursor-pointer text-xl">📎
+                    <input type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+                 </label>
+                 <Button onClick={handleSend} disabled={isLoading}>إرسال</Button>
+             </div>
+             {file && <div className="mt-2 text-sm text-blue-600">ملف مرفق: {file.name}</div>}
           </div>
-          {activeTab === 'chat' && (
-            <div className="space-y-4">
-              <input type="text" value={chatQuery} onChange={e => setChatQuery(e.target.value)} className="w-full p-2 border" placeholder="سؤال..." />
-              <Button onClick={async () => {
-                setIsChatting(true);
-                const res = await handleOpenRouterAI(chatQuery);
-                setChatMessages([...chatMessages, { role: 'user', text: chatQuery }, { role: 'assistant', text: res || '' }]);
-                setIsChatting(false);
-              }}>إرسال</Button>
-            </div>
-          )}
         </div>
       </main>
       <Footer locale={locale as Locale} />

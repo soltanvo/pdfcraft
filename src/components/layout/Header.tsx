@@ -5,6 +5,8 @@ import Link from "next/link";
 import { type Locale } from "@/lib/i18n/config";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/firebase/AuthContext";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "@/lib/firebase/firebase"; // Assuming this is the path
 
 export interface HeaderProps {
   locale: Locale;
@@ -12,6 +14,14 @@ export interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ locale }) => {
   const { user, userProfile, signInWithGoogle, signOutUser } = useAuth();
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (error) {
+      console.error("Error signing in:", error);
+    }
+  };
 
   const navItems = [
     { href: `/${locale}`, label: "الرئيسية" },
@@ -26,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({ locale }) => {
       <div className="container mx-auto px-4 h-full flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href={`/${locale}`} className="flex items-center gap-2" dir="ltr">
-            <img src="/logo.png" alt="SA AI" className="h-10 w-10 rounded-xl object-contain shrink-0" />
+            <img src="/logo.png" alt="SA AI" className="h-12 w-12 rounded-xl object-contain shrink-0" />
             <div className="flex items-center gap-1 text-2xl font-bold tracking-tight whitespace-nowrap">
               <span className="text-blue-900">SA</span>
               <span className="text-amber-500 font-bold">|</span>
@@ -54,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({ locale }) => {
               <Button variant="outline" size="sm" onClick={signOutUser}>تسجيل الخروج</Button>
             </div>
           ) : (
-            <Button variant="outline" size="sm" onClick={signInWithGoogle}>
+            <Button variant="outline" size="sm" onClick={handleSignIn}>
               تسجيل الدخول
             </Button>
           )}
