@@ -8,8 +8,8 @@ import { WorkflowTemplate } from '@/types/workflow';
 export const workflowTemplates: WorkflowTemplate[] = [
     {
         id: 'secure-contract-vault',
-        name: '合同安全加水印与加密归档 (Secure Contract Publishing)',
-        description: '从 PDF 输入开始，依次添加水印、敏感信息脱敏、高强度密码加密，并直接提供下载产物',
+        name: "تأمين العقود ووضع علامات مائية وتشفير الأرشيف (Secure Contract Publishing)",
+        description: 'ابدأ بـ PDF، أضف علامات مائية، قم بتنقيح المعلومات الحساسة، وطبق تشفيراً قوياً للأرشيف.',
         category: 'security',
         nodes: [
             {

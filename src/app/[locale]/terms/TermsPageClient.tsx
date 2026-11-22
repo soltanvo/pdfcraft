@@ -114,6 +114,14 @@ export default function PrivacyPageClient({ locale }: PrivacyPageClientProps) {
               </ul>
 
               <h2 className="text-2xl font-bold text-[hsl(var(--color-foreground))] mt-8 mb-4">
+                إخلاء المسؤولية (Disclaimer)
+              </h2>
+              <p className="text-[hsl(var(--color-muted-foreground))] mb-4">
+                منصة SA AI هي أداة تقنية لمعالجة ملفات PDF محلياً فقط. نحن لا نقوم بتخزين ملفات المستخدمين على أي خادم.
+                يتحمل المستخدم المسؤولية القانونية الكاملة عن محتوى ملفاته واستخدامه للمنصة، وننصح دائماً بمراجعة الملفات قبل وبعد المعالجة.
+              </p>
+
+              <h2 className="text-2xl font-bold text-[hsl(var(--color-foreground))] mt-8 mb-4">
                 3. Information We Collect
               </h2>
               <h3 className="text-xl font-semibold text-[hsl(var(--color-foreground))] mt-6 mb-3">
