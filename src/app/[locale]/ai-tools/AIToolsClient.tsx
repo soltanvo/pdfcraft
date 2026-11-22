@@ -1,5 +1,4 @@
-'use client';
-
+import { type Locale } from '@/lib/i18n/config';
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/firebase/AuthContext';
 import { Header } from '@/components/layout/Header';
@@ -38,7 +37,7 @@ export default function AIToolsClient({ locale }: { locale: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
-      <Header />
+      <Header locale={locale as Locale} />
       <main className="container mx-auto p-4">
         <h1 className="text-3xl font-bold mb-6 text-center">أدوات SA AI</h1>
         <div className="flex gap-4 justify-center mb-8">
