@@ -10,6 +10,7 @@ export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = 'ar';
 
 export const localeConfig: Record<Locale, {
+  en: { name: 'English', nativeName: 'English', direction: 'ltr', dateFormat: 'MM/dd/yyyy' },
   name: string;
   nativeName: string;
   direction: 'ltr' | 'rtl';
