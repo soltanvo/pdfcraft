@@ -3,7 +3,7 @@ import { auth, googleProvider } from "@/lib/firebase/client";
 import { signInWithPopup } from "firebase/auth";
 import { Button } from "@/components/ui/Button";
 
-export default function Header({ locale }: { locale: string }) {
+export function Header({ locale }: { locale: string }) {
   const handleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); } catch (e: any) { alert(e.message); }
   };
@@ -14,3 +14,5 @@ export default function Header({ locale }: { locale: string }) {
     </header>
   );
 }
+
+export default Header;
