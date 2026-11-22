@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
-import { locales, type Locale } from '@/lib/i18n/config';
+import { locales, type Locale, defaultLocale, isValidLocale } from '@/lib/i18n/config';
 import { generateAboutMetadata } from '@/lib/seo';
 import AboutPageClient from './AboutPageClient';
 
@@ -14,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const validLocale = isValidLocale(locale) ? locale : defaultLocale;
+  const validLocale = (locales.includes(locale as any) ? locale : defaultLocale) as Locale;
   const t = await getTranslations({ locale: validLocale, namespace: 'metadata' });
 
   return generateAboutMetadata(validLocale, {
