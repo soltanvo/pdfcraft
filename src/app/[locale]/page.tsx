@@ -14,7 +14,7 @@ interface HomePageProps {
 
 export async function generateMetadata({ params }: HomePageProps): Promise<Metadata> {
   const { locale } = await params;
-  const validLocale = isValidLocale(locale) ? locale : defaultLocale;
+  const validLocale = locales.includes(locale as any) ? locale : defaultLocale;
   const t = await getTranslations({ locale: validLocale, namespace: 'metadata' });
 
   return generateHomeMetadata(validLocale, {
