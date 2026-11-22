@@ -33,7 +33,7 @@ export function OrganizeToolOptions({
   options,
   onChange,
   totalPages = 1,
-  locale = 'en',
+  locale = 'ar',
 }: OrganizeToolOptionsProps) {
   const validLocale = (locale as string) || 'en';
   const isZh = validLocale.toLowerCase().startsWith('zh');

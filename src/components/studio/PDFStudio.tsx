@@ -74,7 +74,7 @@ function checkIsMac(): boolean {
 }
 
 export const PDFStudio: React.FC<PDFStudioProps> = ({
-  locale = 'en',
+  locale = 'ar',
   className = '',
   initialFile = null,
 }) => {

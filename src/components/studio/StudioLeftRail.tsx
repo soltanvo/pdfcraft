@@ -117,7 +117,7 @@ export const StudioLeftRail: React.FC<StudioLeftRailProps> = ({
   isCollapsed,
   onToggleCollapse,
   disabled = false,
-  locale = 'en',
+  locale = 'ar',
   onQuickApply,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');

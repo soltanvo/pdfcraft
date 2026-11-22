@@ -235,7 +235,7 @@ export const StudioToolDrawer: React.FC<StudioToolDrawerProps> = ({
   onApply,
   onExport,
   isApplying,
-  locale = 'en',
+  locale = 'ar',
   availableDocuments = [],
   totalPages = 1,
 }) => {

@@ -25,7 +25,7 @@ export function SecurityToolOptions({
   options,
   onChange,
   totalPages = 1,
-  locale = 'en',
+  locale = 'ar',
 }: SecurityToolOptionsProps) {
   const validLocale = (locale as string) || 'en';
   const isZh = validLocale.toLowerCase().startsWith('zh');

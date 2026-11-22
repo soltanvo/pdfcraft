@@ -28,7 +28,7 @@ export function ExportToolOptions({
   options,
   onChange,
   totalPages = 1,
-  locale = 'en',
+  locale = 'ar',
 }: ExportToolOptionsProps) {
   const validLocale = (locale as string) || 'en';
   const isZh = validLocale.toLowerCase().startsWith('zh');
