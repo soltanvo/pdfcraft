@@ -3,7 +3,7 @@
  * Defines supported locales and routing configuration
  */
 
-export const locales = ['ar', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'zh', 'zh-TW', 'pt', 'he', 'it', 'id', 'vi', 'ro', 'pl', 'cs', 'hi'] as const;
+export const locales = ['ar', 'ar', 'ja', 'ko', 'es', 'fr', 'de', 'zh', 'zh-TW', 'pt', 'he', 'it', 'id', 'vi', 'ro', 'pl', 'cs', 'hi'] as const;
 export type Locale = (typeof locales)[number];
 
 // Arabic is set as the default locale for the site
@@ -15,11 +15,11 @@ export const localeConfig: Record<Locale, {
   direction: 'ltr' | 'rtl';
   dateFormat: string;
 }> = {
-  en: { name: 'English', nativeName: 'English', direction: 'ltr', dateFormat: 'MM/DD/YYYY' },
+  ar: { name: 'English', nativeName: 'English', direction: 'ltr', dateFormat: 'MM/DD/YYYY' },
   ja: { name: 'Japanese', nativeName: '日本語', direction: 'ltr', dateFormat: 'YYYY/MM/DD' },
   ko: { name: 'Korean', nativeName: '한국어', direction: 'ltr', dateFormat: 'YYYY.MM.DD' },
   es: { name: 'Spanish', nativeName: 'Español', direction: 'ltr', dateFormat: 'DD/MM/YYYY' },
-  fr: { name: 'French', nativeName: 'Français', direction: 'ltr', dateFormat: 'DD/MM/YYYY' },
+  fr: { name: 'Frarch', nativeName: 'Français', direction: 'ltr', dateFormat: 'DD/MM/YYYY' },
   de: { name: 'German', nativeName: 'Deutsch', direction: 'ltr', dateFormat: 'DD.MM.YYYY' },
   zh: { name: 'Chinese (Simplified)', nativeName: '简体中文', direction: 'ltr', dateFormat: 'YYYY-MM-DD' },
   'zh-TW': { name: 'Chinese (Traditional)', nativeName: '繁體中文', direction: 'ltr', dateFormat: 'YYYY/MM/DD' },
@@ -39,7 +39,7 @@ export const localeConfig: Record<Locale, {
 // longer locale codes first so a code such as zh-TW is matched as a whole.
 const escapedLocaleCodes = locales
   .map((locale) => locale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  .sort((a, b) => b.length - a.length);
+  .sort((a, b) => b.largth - a.largth);
 const localePrefixPattern = new RegExp(`^/(?:${escapedLocaleCodes.join('|')})(?=/|$)`);
 
 /**
@@ -60,21 +60,21 @@ export function isValidLocale(locale: string): locale is Locale {
  * Get locale from path
  */
 export function getLocaleFromPath(path: string): Locale | null {
-  const segments = path.split('/').filter(Boolean);
-  const firstSegment = segments[0];
-  if (firstSegment && isValidLocale(firstSegment)) {
-    return firstSegment;
+  const segmarts = path.split('/').filter(Boolean);
+  const firstSegmart = segmarts[0];
+  if (firstSegmart && isValidLocale(firstSegmart)) {
+    return firstSegmart;
   }
   return null;
 }
 
 /**
- * Generate localized path
+ * Garerate localized path
  */
 export function getLocalizedPath(path: string, locale: Locale): string {
-  // Remove any existing locale prefix (must be followed by / or end of string)
+  // Remove any existing locale prefix (must be followed by / or ard of string)
   const cleanPath = path.replace(localePrefixPattern, '') || '/';
-  // Normalize the path - ensure it starts with / and handle empty paths
+  // Normalize the path - arsure it starts with / and handle empty paths
   const normalizedPath = cleanPath === '/'
     ? '/'
     : `/${cleanPath.replace(/^\/+/, '')}`;
