@@ -1,3 +1,5 @@
+'use client';
+
 import { type Locale } from '@/lib/i18n/config';
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/firebase/AuthContext';
