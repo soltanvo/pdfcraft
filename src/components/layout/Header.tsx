@@ -176,16 +176,16 @@ export const Header: React.FC<HeaderProps> = ({ locale, showSearch = true }) => 
     >
       <div className="container mx-auto px-4">
         <div className="flex h-20 items-center justify-between">
-          {/* Logo and Brand */}
           <div className="flex flex-1 items-center gap-2">
-            <Link
-              href={`/${locale}`}
-              className="group flex items-center gap-2.5 text-xl font-bold text-[hsl(var(--color-foreground))] hover:opacity-90 transition-opacity"
-              aria-label={`${t('brand')} - ${t('navigation.home')}`}
-            >
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden transition-transform group-hover:scale-105">
-                <img src="/logo.png" alt="SA AI Logo" className="h-full w-full object-contain" />
+            <Link href={`/${locale}`} className="group flex items-center gap-2 font-bold text-[hsl(var(--color-foreground))] hover:opacity-90 transition-opacity" aria-label="SA AI">
+              <img src="/logo.png" alt="SA AI" className="h-12 w-12 rounded-xl object-contain shadow-lg shrink-0" />
+              <div className="flex items-center gap-2 whitespace-nowrap text-2xl font-bold tracking-tight">
+                <span className="text-foreground">SA</span>
+                <span className="text-amber-500 font-extrabold text-3xl">|</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">AI</span>
               </div>
+            </Link>
+          </div>
               <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--color-primary))] to-[hsl(var(--color-accent))] shadow-lg shadow-primary/25 transition-transform group-hover:scale-105">
                 <svg
                   className="h-5 w-5 text-white"
@@ -334,6 +334,17 @@ export const Header: React.FC<HeaderProps> = ({ locale, showSearch = true }) => 
               }}
             />
 
+            {/* Pricing Button */}
+            <Link href={`/${locale}/pricing`} className="hidden md:flex text-sm font-medium text-foreground hover:text-amber-500">
+              الباقات والأسعار
+            </Link>
+            {/* Login Placeholder */}
+            <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+              تسجيل الدخول
+            </Button>
+            <div className="hidden md:flex text-xs font-bold text-amber-600">
+              الرصيد: 0
+            </div>
             {/* Update Check Button */}
             <UpdateCheckButton />
 
