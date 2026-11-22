@@ -1,57 +1,59 @@
 'use client';
-
-import { type Locale } from '@/lib/i18n/config';
-import React, { useState } from 'react';
-import { useAuth } from '@/lib/firebase/AuthContext';
+import { useState, useRef } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
-import { Plus, Send, FileText, Image as ImageIcon } from 'lucide-react';
+import { Plus, Send } from 'lucide-react';
 
 export default function AIToolsClient({ locale }: { locale: string }) {
-  const { user, signInWithGoogle } = useAuth();
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant', text: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: string, content: any }[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setMessages(prev => [...prev, { role: 'user', content: [{ type: 'text', text: 'صورة مرفقة: ' + file.name }, { type: 'image_url', image_url: { url: reader.result } }] }]);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSend = async () => {
-    if (!user) { signInWithGoogle(); return; }
-    if (!input.trim() && !file) return;
-
+    if (!input.trim()) return;
     setIsLoading(true);
-    // Call /api/ai here
-    setMessages(prev => [...prev, { role: 'user', text: input }]);
+    const newMsg = { role: 'user', content: input };
+    const updatedMessages = [...messages, { role: 'user', content: input }];
+    setMessages(updatedMessages);
     setInput('');
-    setFile(null);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setMessages(prev => [...prev, { role: 'assistant', text: "هذا رد تجريبي من SA AI" }]);
+
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      body: JSON.stringify({ messages: updatedMessages }),
+    });
+    const data = await res.json();
+    setMessages(prev => [...prev, { role: 'assistant', content: data.choices[0].message.content }]);
     setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header locale={locale as Locale} />
-      <div className="flex-1 flex pt-16">
-        {/* Left Chat Sidebar */}
-        <div className={`w-full lg:w-[420px] h-[calc(100vh-4rem)] border-r flex flex-col bg-white relative ${isLoading ? 'p-[2px] bg-gradient-to-r from-amber-400 to-blue-500' : ''}`}>
-          <div className="flex-1 bg-white p-4 overflow-y-auto">
-             {messages.map((m, i) => <div key={i} className="mb-2 p-2 bg-gray-100 rounded">{m.text}</div>)}
-          </div>
-          <div className="p-4 border-t bg-white">
-            <div className="flex items-center gap-2">
-                <label className="p-2 bg-gray-200 rounded-full cursor-pointer"><Plus size={20} /></label>
-                <input value={input} onChange={e => setInput(e.target.value)} className="flex-1 p-2 border rounded" placeholder="اسأل..." />
-                <Button onClick={handleSend}><Send size={20} /></Button>
+    <div className="flex h-screen overflow-hidden" dir="ltr">
+        <div className="w-[420px] border-r flex flex-col bg-white h-full" style={{ border: isLoading ? '2px solid gold' : '1px solid #ccc' }}>
+            <div className="flex-1 overflow-y-auto p-4" dir="rtl">
+                {messages.map((m, i) => <div key={i} className="mb-4">{typeof m.content === 'string' ? m.content : 'صورة/ملف'}</div>)}
             </div>
-          </div>
+            <div className="p-4 border-t" dir="rtl">
+                <div className="flex gap-2">
+                    <button onClick={() => fileInputRef.current?.click()} className="p-2 border rounded"><Plus /></button>
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                    <input value={input} onChange={e => setInput(e.target.value)} className="flex-1 border p-2 rounded" placeholder="اسأل..." />
+                    <Button onClick={handleSend} disabled={isLoading}><Send /></Button>
+                </div>
+            </div>
         </div>
-        {/* Main Content Area */}
-        <div className="flex-1 bg-gray-50 p-8">
-            <h1 className="text-2xl font-bold">مساحة المعاينة والنتائج</h1>
-        </div>
-      </div>
+        <div className="flex-1 bg-gray-100 p-8">معاينة النتائج هنا</div>
     </div>
   );
 }
