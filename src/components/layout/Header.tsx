@@ -160,6 +160,7 @@ export const Header: React.FC<HeaderProps> = ({ locale, showSearch = true }) => 
     { href: `/${locale}`, label: t('navigation.home') },
     { href: `/${locale}/studio`, label: 'Studio' },
     { href: `/${locale}/tools`, label: t('navigation.tools') },
+    { href: `/${locale}/ai-tools`, label: t('navigation.aiTools') || 'AI Tools' },
     { href: `/${locale}/workflow`, label: t('navigation.workflow') || 'Workflow' },
     { href: `/${locale}/about`, label: t('navigation.about') },
     { href: `/${locale}/faq`, label: t('navigation.faq') },

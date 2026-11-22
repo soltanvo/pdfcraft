@@ -1,32 +1,33 @@
 /**
  * Site configuration
  */
+
 export const siteConfig = {
-  name: 'PDFCraft',
-  description: 'Professional PDF Tools - Free, Private & Browser-Based. Merge, split, compress, convert, and edit PDF files online without uploading to servers.',
+  name: 'SA AI',
+  description: 'أدوات PDF - مجانية، خاصة وتعتمد على المتصفح. دمج، تقسيم، ضغط، تحويل وتحرير ملفات PDF على الإنترنت دون رفعها للخوادم.',
   url: 'https://pdfcraft.devtoolcafe.com',
   ogImage: '/images/og-image.png',
   links: {
     github: 'https://github.com/PDFCraftTool/pdfcraft',
     twitter: 'https://twitter.com/pdfcraft',
   },
-  creator: 'PDFCraft Team',
+  creator: '[فريق المنصة]',
   keywords: [
-    'PDF tools',
-    'PDF editor',
-    'merge PDF',
-    'split PDF',
-    'compress PDF',
-    'convert PDF',
-    'free PDF tools',
-    'online PDF editor',
-    'browser-based PDF',
-    'private PDF processing',
+    'أدوات PDF',
+    'محرر PDF',
+    'دمج PDF',
+    'تقسيم PDF',
+    'ضغط PDF',
+    'تحويل PDF',
+    'أدوات PDF مجانية',
+    'محرر PDF على الإنترنت',
+    'يعتمد على المتصفح',
+    'معالجة خاصة لملفات PDF',
   ],
   // SEO-related settings
   seo: {
-    titleTemplate: '%s | PDFCraft',
-    defaultTitle: 'PDFCraft - Professional PDF Tools',
+    titleTemplate: '%s | SA AI',
+    defaultTitle: 'SA AI - أدوات PDF',
     twitterHandle: '@pdfcraft',
     locale: 'en_US',
   },
@@ -35,6 +36,7 @@ export const siteConfig = {
 /**
  * Navigation configuration
  */
+
 export const navConfig = {
   mainNav: [
     { title: 'Home', href: '/' },
