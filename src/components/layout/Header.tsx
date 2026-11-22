@@ -183,6 +183,9 @@ export const Header: React.FC<HeaderProps> = ({ locale, showSearch = true }) => 
               className="group flex items-center gap-2.5 text-xl font-bold text-[hsl(var(--color-foreground))] hover:opacity-90 transition-opacity"
               aria-label={`${t('brand')} - ${t('navigation.home')}`}
             >
+              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden transition-transform group-hover:scale-105">
+                <img src="/logo.png" alt="SA AI Logo" className="h-full w-full object-contain" />
+              </div>
               <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(var(--color-primary))] to-[hsl(var(--color-accent))] shadow-lg shadow-primary/25 transition-transform group-hover:scale-105">
                 <svg
                   className="h-5 w-5 text-white"
