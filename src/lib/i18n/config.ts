@@ -3,7 +3,7 @@
  * Defines supported locales and routing configuration
  */
 
-export const locales = ['ar', 'ar', 'ja', 'ko', 'es', 'fr', 'de', 'zh', 'zh-TW', 'pt', 'he', 'it', 'id', 'vi', 'ro', 'pl', 'cs', 'hi'] as const;
+export const locales = ['ar', 'ar', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'zh', 'zh-TW', 'pt', 'he', 'it', 'id', 'vi', 'ro', 'pl', 'cs', 'hi'] as const;
 export type Locale = (typeof locales)[number];
 
 // Arabic is set as the default locale for the site
