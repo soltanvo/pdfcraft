@@ -14,7 +14,7 @@ interface WorkflowPageProps {
 
 export async function generateMetadata({ params }: WorkflowPageProps): Promise<Metadata> {
     const { locale } = await params;
-    const validLocale = locales.includes(locale as any) ? locale : defaultLocale;
+    const validLocale = (locales.includes(locale as any) ? locale : 'ar') as any;
     const t = await getTranslations({ locale: validLocale, namespace: 'common' });
 
     return generateBaseMetadata({

@@ -14,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const validLocale = (locales.includes(locale as any) ? locale : defaultLocale) as Locale;
+  const validLocale = ((locales.includes(locale as any) ? locale : 'ar') as any) as Locale;
   const t = await getTranslations({ locale: validLocale, namespace: 'metadata' });
 
   return generateAboutMetadata(validLocale, {

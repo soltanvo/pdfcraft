@@ -14,7 +14,7 @@ interface StudioPageProps {
 
 export async function generateMetadata({ params }: StudioPageProps): Promise<Metadata> {
   const { locale } = await params;
-  const validLocale = locales.includes(locale as any) ? locale : defaultLocale;
+  const validLocale = (locales.includes(locale as any) ? locale : 'ar') as any;
   const isZh = validLocale === 'zh';
 
   return generateBaseMetadata({
