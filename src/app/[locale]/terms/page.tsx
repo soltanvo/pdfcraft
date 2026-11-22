@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 import { locales, type Locale } from '@/lib/i18n/config';
 import { generatePrivacyMetadata } from '@/lib/seo';
-import PrivacyPageClient from './PrivacyPageClient';
+import TermsPageClient from './TermsPageClient';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -33,5 +33,5 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
   // Enable static rendering
   setRequestLocale(locale);
 
-  return <PrivacyPageClient locale={locale as Locale} />;
+  return <TermsPageClient locale={locale as Locale} />;
 }
