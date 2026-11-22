@@ -5,16 +5,13 @@ import { notFound } from 'next/navigation';
 import { localeConfig, type Locale, locales } from '@/lib/i18n/config';
 import { fontVariablesFor } from '@/lib/fonts';
 import { SkipLink } from '@/components/common/SkipLink';
+import { AuthProvider } from '@/lib/firebase/AuthContext';
 import '@/app/globals.css';
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-/**
- * Viewport configuration for performance
- * Requirements: 8.1 - Lighthouse performance score 90+
- */
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -34,26 +31,27 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
 
-  // Validate locale
   if (!locales.includes(locale as Locale)) {
     notFound();
   }
 
-  // Enable static rendering
   setRequestLocale(locale);
-
-  // Get messages for the locale
   const messages = await getMessages();
-
-  // Get direction for the locale
   const direction = localeConfig[locale as Locale]?.direction || 'ltr';
 
   return (
-    <NextIntlClientProvider messages={messages}>
-      <div lang={locale} dir={direction} className={`${fontVariablesFor(direction)} min-h-screen bg-background text-foreground antialiased font-sans`}>
-        <SkipLink targetId="main-content">Skip to main content</SkipLink>
-        {children}
-      </div>
-    </NextIntlClientProvider>
+    <html lang={locale} dir={direction}>
+      <head>
+        <link rel="icon" href="/logo.png" />
+      </head>
+      <body className={`${fontVariablesFor(direction)} min-h-screen bg-background text-foreground antialiased font-sans`}>
+        <AuthProvider>
+          <NextIntlClientProvider messages={messages}>
+            <SkipLink targetId="main-content">Skip to main content</SkipLink>
+            {children}
+          </NextIntlClientProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }

@@ -1,13 +1,18 @@
+'use client';
+
 import React from "react";
 import Link from "next/link";
 import { type Locale } from "@/lib/i18n/config";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/lib/firebase/AuthContext";
 
 export interface HeaderProps {
   locale: Locale;
 }
 
 export const Header: React.FC<HeaderProps> = ({ locale }) => {
+  const { user, userProfile, signInWithGoogle, signOutUser } = useAuth();
+
   const navItems = [
     { href: `/${locale}`, label: "الرئيسية" },
     { href: `/${locale}/tools`, label: "الأدوات" },
@@ -21,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({ locale }) => {
       <div className="container mx-auto px-4 h-full flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link href={`/${locale}`} className="flex items-center gap-2" dir="ltr">
-            <img src="/logo.png" alt="SA AI" className="h-12 w-12 rounded-xl object-contain shrink-0" />
+            <img src="/logo.png" alt="SA AI" className="h-10 w-10 rounded-xl object-contain shrink-0" />
             <div className="flex items-center gap-1 text-2xl font-bold tracking-tight whitespace-nowrap">
               <span className="text-blue-900">SA</span>
               <span className="text-amber-500 font-bold">|</span>
@@ -39,10 +44,20 @@ export const Header: React.FC<HeaderProps> = ({ locale }) => {
         </div>
 
         <div className="flex items-center gap-4">
-          <span className="text-sm font-bold text-gray-700">الرصيد: 0</span>
-          <Button variant="outline" size="sm" className="whitespace-nowrap">
-            تسجيل الدخول
-          </Button>
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                {userProfile?.photoURL && <img src={userProfile.photoURL} alt="Avatar" className="h-8 w-8 rounded-full" />}
+                <span className="text-sm font-medium text-gray-700">{userProfile?.displayName}</span>
+                <span className="text-sm font-bold text-amber-600">الرصيد: {userProfile?.credits || 0}</span>
+              </div>
+              <Button variant="outline" size="sm" onClick={signOutUser}>تسجيل الخروج</Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={signInWithGoogle}>
+              تسجيل الدخول
+            </Button>
+          )}
         </div>
       </div>
     </header>
