@@ -6,7 +6,12 @@ import { type Locale } from "@/lib/i18n/config";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/firebase/AuthContext";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "@/lib/firebase/config"; // Assuming this is the path
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { firebaseConfig } from "@/lib/firebase/config";
+
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const auth = getAuth(app); // Assuming this is the path
 
 export interface HeaderProps {
   locale: Locale;
