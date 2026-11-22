@@ -1,35 +1,13 @@
-import type { Metadata } from 'next';
-import { setRequestLocale, getTranslations } from 'next-intl/server';
-import { locales, type Locale } from '@/lib/i18n/config';
-import { generateBaseMetadata } from '@/lib/seo';
-import WorkflowPageClient from './WorkflowPageClient';
+import { setRequestLocale } from 'next-intl/server';
+import { WorkflowEditor } from '@/components/WorkflowEditor';
 
-export function generateStaticParams() {
-    return locales.map((locale) => ({ locale }));
-}
+export default async function WorkflowPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
 
-interface WorkflowPageProps {
-    params: Promise<{ locale: string }>;
-}
-
-export async function generateMetadata({ params }: WorkflowPageProps): Promise<Metadata> {
-    const { locale } = await params;
-    const validLocale = (locales.includes(locale as any) ? locale : 'ar') as any;
-    const t = await getTranslations({ locale: validLocale, namespace: 'common' });
-
-    return generateBaseMetadata({
-        locale: validLocale,
-        path: '/workflow',
-        title: t('navigation.workflow') || 'Workflow',
-        description: t('tagline') || 'Professional, secure, and free PDF tools for everyone.',
-    });
-}
-
-export default async function WorkflowPage({ params }: WorkflowPageProps) {
-    const { locale } = await params;
-
-    // Enable static rendering
-    setRequestLocale(locale);
-
-    return <WorkflowPageClient locale={locale as Locale} />;
+  return <WorkflowEditor />;
 }

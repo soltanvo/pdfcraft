@@ -1,21 +1,24 @@
-import type { Viewport } from 'next';
+import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import { localeConfig, type Locale, locales } from '@/lib/i18n/config';
 import { fontVariablesFor } from '@/lib/fonts';
-import { AuthProvider } from '@/lib/firebase/AuthContext';
-import '@/app/globals.css';
+import { getDirection, isValidLocale, locales } from '@/lib/i18n/config';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
+import { AuthProvider } from '@/components/AuthProvider';
+
+export const metadata: Metadata = {
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
+};
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  themeColor: '#ffffff',
-};
 
 export default async function LocaleLayout({
   children,
@@ -26,25 +29,33 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
 
-  if (!locales.includes(locale as Locale)) {
+  if (!isValidLocale(locale)) {
     notFound();
   }
 
   setRequestLocale(locale);
   const messages = await getMessages();
-  const direction = localeConfig[locale as Locale]?.direction || 'ltr';
+  const direction = getDirection(locale);
 
   return (
-    <html lang={locale} dir={direction}>
+    <html
+      lang={locale}
+      dir={direction}
+      className={fontVariablesFor(direction)}
+      suppressHydrationWarning
+    >
       <head>
-        <link rel="icon" href="/logo.png" />
+        <meta charSet="utf-8" />
+        <link rel="icon" href="/logo.png" type="image/png" />
       </head>
-      <body className={`${fontVariablesFor(direction)} min-h-screen bg-background text-foreground antialiased font-sans`}>
-        <AuthProvider>
-          <NextIntlClientProvider messages={messages}>
-            {children}
-          </NextIntlClientProvider>
-        </AuthProvider>
+      <body className="min-h-screen flex flex-col bg-white text-slate-900 antialiased">
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <AuthProvider>
+            <Header locale={locale} />
+            <main className="flex-1">{children}</main>
+            <Footer locale={locale} />
+          </AuthProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

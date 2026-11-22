@@ -1,12 +1,3 @@
-module.exports = {
-  Canvas: function() {},
-  Image: function() {},
-  createCanvas: function() { return {}; },
-  loadImage: function() { return Promise.resolve({}); }
-};
-export default {
-  Canvas: function() {},
-  Image: function() {},
-  createCanvas: function() { return {}; },
-  loadImage: function() { return Promise.resolve({}); }
-};
+// Browser mock for Node-only canvas package used by pdfjs-dist-legacy
+const canvasMock = {};
+export default canvasMock;

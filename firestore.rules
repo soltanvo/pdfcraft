@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUserCreate(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'photoURL', 'credits', 'isPaid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'credits', 'isPaid', 'lastOrderId', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.email is string
+        && data.email.size() <= 320
+        && data.displayName is string
+        && data.displayName.size() <= 120
+        && data.photoURL is string
+        && data.photoURL.size() <= 1000
+        && data.credits is int
+        && data.credits == 5
+        && data.isPaid is bool
+        && data.isPaid == false
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidUserUpdate(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'photoURL', 'credits', 'isPaid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'credits', 'isPaid', 'lastOrderId', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.email is string
+        && data.email.size() <= 320
+        && data.displayName is string
+        && data.displayName.size() <= 120
+        && data.photoURL is string
+        && data.photoURL.size() <= 1000
+        && data.credits is int
+        && data.credits >= 0
+        && data.credits <= 10000
+        && data.isPaid is bool;
+    }
+
+    function isValidTransaction(data, userId) {
+      return data.keys().hasAll(['userId', 'orderId', 'planId', 'creditsAdded', 'amountUsd', 'status', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'orderId', 'planId', 'creditsAdded', 'amountUsd', 'status', 'createdAt'])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.orderId is string
+        && data.orderId.size() >= 3
+        && data.orderId.size() <= 128
+        && data.planId is string
+        && (data.planId == 'starter' || data.planId == 'pro')
+        && data.creditsAdded is int
+        && ((data.planId == 'starter' && data.creditsAdded == 30 && data.amountUsd == 2)
+          || (data.planId == 'pro' && data.creditsAdded == 100 && data.amountUsd == 5))
+        && data.status is string
+        && data.status == 'COMPLETED'
+        && data.createdAt == request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserCreate(incoming());
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserUpdate(incoming())
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+          || (
+            incoming().diff(existing()).affectedKeys().hasOnly(['credits', 'updatedAt'])
+            && existing().credits >= 1
+            && incoming().credits == existing().credits - 1
+          )
+          || (
+            incoming().diff(existing()).affectedKeys().hasOnly(['credits', 'isPaid', 'lastOrderId', 'updatedAt'])
+            && incoming().isPaid == true
+            && incoming().lastOrderId is string
+            && incoming().lastOrderId.size() >= 3
+            && incoming().lastOrderId.size() <= 128
+            && (!('lastOrderId' in existing()) || incoming().lastOrderId != existing().lastOrderId)
+            && (incoming().credits == existing().credits + 30 || incoming().credits == existing().credits + 100)
+          )
+        );
+      allow delete: if false;
+
+      match /transactions/{transactionId} {
+        allow get: if isValidId(userId) && isValidId(transactionId) && isOwner(userId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isVerified()
+          && isValidId(userId)
+          && isValidId(transactionId)
+          && isOwner(userId)
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && isValidTransaction(incoming(), userId);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

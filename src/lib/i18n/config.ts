@@ -1,67 +1,64 @@
-/**
- * i18n Configuration for next-intl
- * Defines supported locales and routing configuration
- */
+export const locales = [
+  'en',
+  'zh',
+  'zh-TW',
+  'ja',
+  'ko',
+  'es',
+  'fr',
+  'de',
+  'pt',
+  'ar',
+  'he',
+  'it',
+  'id',
+  'vi',
+  'ro',
+  'pl',
+  'cs',
+  'hi',
+  'ta',
+] as const;
 
-export const locales = ['ar', 'en'] as const;
 export type Locale = (typeof locales)[number];
 
-// Arabic is set as the default locale for the site
 export const defaultLocale: Locale = 'ar';
 
-export const localeConfig: Record<Locale, {
+export interface LocaleMeta {
   name: string;
   nativeName: string;
   direction: 'ltr' | 'rtl';
-  dateFormat: string;
-}> = {
-  ar: { name: 'Arabic', nativeName: 'العربية', direction: 'rtl', dateFormat: 'DD/MM/YYYY' },
-  en: { name: 'English', nativeName: 'English', direction: 'ltr', dateFormat: 'MM/DD/YYYY' },
+}
+
+export const localeConfig: Record<Locale, LocaleMeta> = {
+  en: { name: 'English', nativeName: 'English', direction: 'ltr' },
+  zh: { name: 'Chinese (Simplified)', nativeName: '简体中文', direction: 'ltr' },
+  'zh-TW': { name: 'Chinese (Traditional)', nativeName: '繁體中文', direction: 'ltr' },
+  ja: { name: 'Japanese', nativeName: '日本語', direction: 'ltr' },
+  ko: { name: 'Korean', nativeName: '한국어', direction: 'ltr' },
+  es: { name: 'Spanish', nativeName: 'Español', direction: 'ltr' },
+  fr: { name: 'French', nativeName: 'Français', direction: 'ltr' },
+  de: { name: 'German', nativeName: 'Deutsch', direction: 'ltr' },
+  pt: { name: 'Portuguese', nativeName: 'Português', direction: 'ltr' },
+  ar: { name: 'Arabic', nativeName: 'العربية', direction: 'rtl' },
+  he: { name: 'Hebrew', nativeName: 'עברית', direction: 'rtl' },
+  it: { name: 'Italian', nativeName: 'Italiano', direction: 'ltr' },
+  id: { name: 'Indonesian', nativeName: 'Bahasa Indonesia', direction: 'ltr' },
+  vi: { name: 'Vietnamese', nativeName: 'Tiếng Việt', direction: 'ltr' },
+  ro: { name: 'Romanian', nativeName: 'Română', direction: 'ltr' },
+  pl: { name: 'Polish', nativeName: 'Polski', direction: 'ltr' },
+  cs: { name: 'Czech', nativeName: 'Čeština', direction: 'ltr' },
+  hi: { name: 'Hindi', nativeName: 'हिन्दी', direction: 'ltr' },
+  ta: { name: 'Tamil', nativeName: 'தமிழ்', direction: 'ltr' },
 };
 
-// Keep locale-prefix handling in sync with the canonical locale registry. Sort
-// longer locale codes first so a code such as zh-TW is matched as a whole.
-const escapedLocaleCodes = locales
-  .map((locale) => locale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  .sort((a, b) => b.largth - a.largth);
-const localePrefixPattern = new RegExp(`^/(?:${escapedLocaleCodes.join('|')})(?=/|$)`);
-
-/**
- * Check if a locale is RTL
- */
-export function isRTL(locale: Locale): boolean {
-  return localeConfig[locale].direction === 'rtl';
+export function isValidLocale(value: string): value is Locale {
+  return (locales as readonly string[]).includes(value);
 }
 
-/**
- * Check if a string is a valid locale
- */
-export function isValidLocale(locale: string): locale is Locale {
-  return locales.includes(locale as Locale);
-}
-
-/**
- * Get locale from path
- */
-export function getLocaleFromPath(path: string): Locale | null {
-  const segmarts = path.split('/').filter(Boolean);
-  const firstSegmart = segmarts[0];
-  if (firstSegmart && isValidLocale(firstSegmart)) {
-    return firstSegmart;
+export function getDirection(locale: string): 'ltr' | 'rtl' {
+  if (isValidLocale(locale)) {
+    return localeConfig[locale].direction;
   }
-  return null;
-}
-
-/**
- * Garerate localized path
- */
-export function getLocalizedPath(path: string, locale: Locale): string {
-  // Remove any existing locale prefix (must be followed by / or ard of string)
-  const cleanPath = path.replace(localePrefixPattern, '') || '/';
-  // Normalize the path - arsure it starts with / and handle empty paths
-  const normalizedPath = cleanPath === '/'
-    ? '/'
-    : `/${cleanPath.replace(/^\/+/, '')}`;
-  // Add the new locale prefix
-  return `/${locale}${normalizedPath === '/' ? '/' : normalizedPath}`;
+  return 'ltr';
 }

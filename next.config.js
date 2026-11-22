@@ -31,8 +31,8 @@ function resolveAppVersion() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable static export for deployment flexibility
-  output: 'export',
+  // Standalone output for Node.js runtime compatibility
+  output: 'standalone',
   
   // Support deployment under a subpath (e.g., /pdfcraft/)
   // Use BASE_PATH or NEXT_PUBLIC_BASE_PATH environment variable
@@ -61,6 +61,23 @@ const nextConfig = {
         worker_threads: false,
         canvas: false,  // Required for pdfjs-dist-legacy
       };
+
+      // Also add module to alias for client packages that reference it
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'module': false,
+      };
+
+      // Ignore problematic modules that are not needed in browser
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^module$/
+        }),
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^canvas$/,
+          contextRegExp: /pdfjs-dist-legacy/
+        })
+      );
     } else {
       // Mark canvas as external for server-side builds
       config.externals = config.externals || [];
@@ -68,23 +85,6 @@ const nextConfig = {
         canvas: 'commonjs canvas',
       });
     }
-
-    // Also add module and canvas to alias for some packages that use it
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'module': false,
-    };
-
-    // Ignore problematic modules that are not needed in browser
-    config.plugins.push(
-      new webpack.IgnorePlugin({
-        resourceRegExp: /^module$/
-      }),
-      new webpack.IgnorePlugin({
-        resourceRegExp: /^canvas$/,
-        contextRegExp: /pdfjs-dist-legacy/
-      })
-    );
 
     // Enable WebAssembly
     config.experiments = {
@@ -263,25 +263,8 @@ const nextConfig = {
             value: 'nosniff',
           },
           {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
-          },
-          // Required for SharedArrayBuffer (LibreOffice WASM)
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
           },
           {
             key: 'Cross-Origin-Resource-Policy',

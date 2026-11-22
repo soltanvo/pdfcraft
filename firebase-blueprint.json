@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "SA AI authenticated user profile, credit balance, and subscription status",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication user UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email",
+          "maxLength": 320
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name from Google Auth",
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile avatar URL",
+          "maxLength": 1000
+        },
+        "credits": {
+          "type": "integer",
+          "description": "Available AI and watermark-free credits (starts at 5 free credits)"
+        },
+        "isPaid": {
+          "type": "boolean",
+          "description": "Whether user has purchased a paid plan (removes SA AI watermark)"
+        },
+        "lastOrderId": {
+          "type": "string",
+          "description": "Most recent PayPal order ID applied to this account",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last account update timestamp"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "photoURL",
+        "credits",
+        "isPaid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CreditTransaction": {
+      "title": "CreditTransaction",
+      "description": "Immutable record of PayPal credit purchases for a user",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderId": {
+          "type": "string",
+          "description": "PayPal order ID",
+          "minLength": 3,
+          "maxLength": 128
+        },
+        "planId": {
+          "type": "string",
+          "enum": ["starter", "pro"],
+          "description": "Purchased plan identifier"
+        },
+        "creditsAdded": {
+          "type": "integer",
+          "description": "Number of credits added (30 or 100)"
+        },
+        "amountUsd": {
+          "type": "number",
+          "description": "USD amount paid (2 or 5)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["COMPLETED"],
+          "description": "PayPal capture status"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Transaction timestamp"
+        }
+      },
+      "required": [
+        "userId",
+        "orderId",
+        "planId",
+        "creditsAdded",
+        "amountUsd",
+        "status",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores per-user credit balance and paid status"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/CreditTransaction"
+      },
+      "description": "Stores verified PayPal purchase history for the owning user"
+    }
+  }
+}
