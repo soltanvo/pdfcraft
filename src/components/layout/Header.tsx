@@ -6,7 +6,7 @@ import { type Locale } from "@/lib/i18n/config";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/firebase/AuthContext";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "@/lib/firebase"; // Assuming this is the path
+import { auth } from "@/lib/firebase/config"; // Assuming this is the path
 
 export interface HeaderProps {
   locale: Locale;
