@@ -4,20 +4,18 @@ import { doc, getDocFromServer, getFirestore, type Firestore } from 'firebase/fi
 import defaultFirebaseConfig from '../../../firebase-applet-config.json';
 
 const envApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
-const envAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
-const envProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
 const envStorageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim();
 const envMessagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim();
 const envAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim();
 
-const hasCoreEnvConfig = Boolean(envApiKey && envAuthDomain && envProjectId);
+const hasEnvApiKey = Boolean(envApiKey);
 
-const firebaseConfig: FirebaseOptions = hasCoreEnvConfig
+const firebaseConfig: FirebaseOptions = hasEnvApiKey
   ? {
       apiKey: envApiKey,
-      authDomain: envAuthDomain,
-      projectId: envProjectId,
-      ...(envStorageBucket ? { storageBucket: envStorageBucket } : {}),
+      authDomain: 'as-pdf-78355.firebaseapp.com',
+      projectId: 'as-pdf-78355',
+      storageBucket: envStorageBucket || 'as-pdf-78355.firebasestorage.app',
       ...(envMessagingSenderId ? { messagingSenderId: envMessagingSenderId } : {}),
       ...(envAppId ? { appId: envAppId } : {}),
     }
@@ -39,8 +37,8 @@ export const firebaseApp: FirebaseApp =
 
 export const auth: Auth = getAuth(firebaseApp);
 
-// Use default Firestore DB when custom env vars are provided; use provisioned DB ID for fallback project config
-export const db: Firestore = hasCoreEnvConfig
+// Use default Firestore DB for as-pdf-78355 when env API key is set; use provisioned DB ID for fallback project config
+export const db: Firestore = hasEnvApiKey
   ? getFirestore(firebaseApp)
   : getFirestore(firebaseApp, defaultFirebaseConfig.firestoreDatabaseId);
 
