@@ -148,14 +148,11 @@ const nextConfig = {
     return [
       {
         // LibreOffice WASM .wasm.bin.gz — serve as application/wasm with gzip Content-Encoding
-        // Same approach as BentoPDF's nginx config so browser decompresses transparently
         source: '/libreoffice-wasm/soffice.wasm.bin.gz',
         headers: [
           { key: 'Content-Type', value: 'application/wasm' },
           { key: 'Content-Encoding', value: 'gzip' },
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ],
       },
@@ -166,8 +163,6 @@ const nextConfig = {
           { key: 'Content-Type', value: 'application/octet-stream' },
           { key: 'Content-Encoding', value: 'gzip' },
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ],
       },
@@ -177,8 +172,6 @@ const nextConfig = {
         headers: [
           { key: 'Content-Type', value: 'application/wasm' },
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ],
       },
@@ -188,19 +181,15 @@ const nextConfig = {
         headers: [
           { key: 'Content-Type', value: 'application/octet-stream' },
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ],
       },
       {
-        // LibreOffice WASM Worker - needs COEP to spawn workers with SharedArrayBuffer access
+        // LibreOffice WASM Worker
         source: '/libreoffice-wasm/browser.worker.global.js',
         headers: [
           { key: 'Content-Type', value: 'application/javascript' },
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ],
       },
@@ -211,14 +200,6 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=31536000, immutable',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
           },
           {
             key: 'Cross-Origin-Resource-Policy',
@@ -251,7 +232,7 @@ const nextConfig = {
         ],
       },
       {
-        // Global security & caching headers for all routes
+        // Global security & caching headers for all routes (allows Google OAuth & PayPal popups/scripts)
         source: '/:path*',
         headers: [
           {
@@ -265,6 +246,10 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
           },
           {
             key: 'Cross-Origin-Resource-Policy',
