@@ -78,28 +78,19 @@ const PAID_PLANS: PaidPlanConfig[] = [
   },
 ];
 
-function getDirectPayPalCheckoutUrl(plan: PaidPlanConfig): string {
-  const paypalMeBase = (process.env.NEXT_PUBLIC_PAYPAL_ME_URL || '').trim().replace(/\/+$/, '');
-  const amountShort = plan.id === 'starter' ? '2' : '5';
-
-  if (paypalMeBase) {
-    return `${paypalMeBase}/${amountShort}USD`;
-  }
-
-  const businessEmail = (process.env.NEXT_PUBLIC_PAYPAL_BUSINESS_EMAIL || '').trim();
-  const params = new URLSearchParams({
-    cmd: '_xclick',
-    currency_code: 'USD',
-    amount: plan.price,
-    item_name: `SA AI - ${plan.titleEn} (${plan.credits} Credits)`,
-  });
-  if (businessEmail) {
-    params.set('business', businessEmail);
-  }
-  return `https://www.paypal.com/cgi-bin/webscr?${params.toString()}`;
+function getNormalizedPayPalMeBase(): string {
+  const raw = (process.env.NEXT_PUBLIC_PAYPAL_ME_URL || '').trim().replace(/\/+$/, '');
+  if (!raw) return '';
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
-function DirectPayPalCheckoutButton({
+function getPayPalMePlanUrl(plan: PaidPlanConfig): string {
+  const base = getNormalizedPayPalMeBase();
+  if (!base) return '';
+  return plan.id === 'starter' ? `${base}/2USD` : `${base}/5USD`;
+}
+
+function DirectPayPalMeButton({
   plan,
   locale,
 }: {
@@ -107,20 +98,30 @@ function DirectPayPalCheckoutButton({
   locale: string;
 }) {
   const isArabic = locale === 'ar';
-  const amountShort = plan.id === 'starter' ? '$2' : '$5';
-  const checkoutUrl = getDirectPayPalCheckoutUrl(plan);
+  const amountLabel = plan.id === 'starter' ? '$2' : '$5';
+  const paypalMeUrl = getPayPalMePlanUrl(plan);
+
+  if (!paypalMeUrl) {
+    return (
+      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs text-center">
+        {isArabic
+          ? 'يرجى إضافة رابط NEXT_PUBLIC_PAYPAL_ME_URL في إعدادات البيئة لتفعيل الدفع المباشر.'
+          : 'Set NEXT_PUBLIC_PAYPAL_ME_URL in environment variables to enable PayPal.me checkout.'}
+      </div>
+    );
+  }
 
   return (
     <a
-      href={checkoutUrl}
+      href={paypalMeUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-[#FFC439] hover:bg-[#f2b82b] text-[#003087] font-bold text-sm shadow-xs transition-colors"
     >
       <span>
         {isArabic
-          ? `الدفع المباشر عبر PayPal (${amountShort})`
-          : `Pay Directly with PayPal (${amountShort})`}
+          ? `الدفع عبر PayPal (${amountLabel})`
+          : `Pay with PayPal (${amountLabel})`}
       </span>
       <ExternalLink className="w-4 h-4 shrink-0" />
     </a>
@@ -157,11 +158,7 @@ function PlanPayPalSdkCheckout({
   }, [isPending]);
 
   if (isRejected || sdkError || (isPending && timedOut)) {
-    return (
-      <div className="space-y-2">
-        <DirectPayPalCheckoutButton plan={plan} locale={locale} />
-      </div>
-    );
+    return <DirectPayPalMeButton plan={plan} locale={locale} />;
   }
 
   return (
@@ -272,10 +269,10 @@ function PlanPayPalSdkCheckout({
 
 function PricingContent({
   locale,
-  hasPayPalSdk,
+  usePayPalSdk,
 }: {
   locale: string;
-  hasPayPalSdk: boolean;
+  usePayPalSdk: boolean;
 }) {
   const isArabic = locale === 'ar';
   const { user, credits, isPaid, signInWithGoogle } = useAuth();
@@ -455,7 +452,7 @@ function PricingContent({
               </div>
 
               <div className="pt-8">
-                {hasPayPalSdk ? (
+                {usePayPalSdk ? (
                   <PlanPayPalSdkCheckout
                     plan={plan}
                     locale={locale}
@@ -469,7 +466,7 @@ function PricingContent({
                     }}
                   />
                 ) : (
-                  <DirectPayPalCheckoutButton plan={plan} locale={locale} />
+                  <DirectPayPalMeButton plan={plan} locale={locale} />
                 )}
               </div>
             </div>
@@ -491,10 +488,12 @@ function PricingContent({
 }
 
 export function PricingPageClient({ locale }: { locale: string }) {
+  const paypalMeBase = getNormalizedPayPalMeBase();
   const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim();
 
-  if (!paypalClientId) {
-    return <PricingContent locale={locale} hasPayPalSdk={false} />;
+  // When NEXT_PUBLIC_PAYPAL_ME_URL is set, use direct PayPal.me (/2USD & /5USD) immediately with zero SDK errors
+  if (paypalMeBase || !paypalClientId) {
+    return <PricingContent locale={locale} usePayPalSdk={false} />;
   }
 
   return (
@@ -505,7 +504,7 @@ export function PricingPageClient({ locale }: { locale: string }) {
         intent: 'capture',
       }}
     >
-      <PricingContent locale={locale} hasPayPalSdk={true} />
+      <PricingContent locale={locale} usePayPalSdk={true} />
     </PayPalScriptProvider>
   );
 }
