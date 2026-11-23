@@ -248,10 +248,6 @@ const nextConfig = {
             value: 'strict-origin-when-cross-origin',
           },
           {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin-allow-popups',
-          },
-          {
             key: 'Cross-Origin-Resource-Policy',
             value: 'cross-origin',
           },

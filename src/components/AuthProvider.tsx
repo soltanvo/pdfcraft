@@ -10,9 +10,11 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -77,6 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const activeDb = db;
 
     void testFirestoreConnection();
+    void getRedirectResult(activeAuth).catch((err: unknown) => {
+      const code = (err as { code?: string })?.code;
+      if (code && code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setError(err instanceof Error ? err.message : 'Google redirect sign-in failed');
+      }
+    });
 
     let unsubscribeDoc: (() => void) | null = null;
 
@@ -164,16 +172,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setAuthBusy(true);
     setError(null);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
       const cred = await signInWithPopup(auth, provider);
       return cred.user;
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
+      const message = err instanceof Error ? err.message : '';
+      const isPopupBlocked =
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-browser' ||
+        /popup/i.test(message) && /block/i.test(message);
+
+      if (isPopupBlocked) {
+        try {
+          await signInWithRedirect(auth, provider);
+          return null;
+        } catch (redirectErr: unknown) {
+          setError(
+            redirectErr instanceof Error
+              ? redirectErr.message
+              : 'Google redirect sign-in failed'
+          );
+          return null;
+        }
+      }
+
       if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-        const msg = err instanceof Error ? err.message : 'Google sign-in failed';
-        setError(msg);
+        setError(message || 'Google sign-in failed');
       }
       return null;
     } finally {
