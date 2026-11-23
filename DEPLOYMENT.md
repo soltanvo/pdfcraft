@@ -70,7 +70,7 @@ netlify deploy --prod --dir=out
 
 ### 3. GitHub Pages
 
-> ⚠️ **Limitation:** GitHub Pages does **not** support custom response headers. This means `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` headers cannot be set, so `SharedArrayBuffer` will be unavailable. **Document conversion tools (Word/Excel/PPT/RTF to PDF) that rely on LibreOffice WASM will not work on GitHub Pages.** All other PDF tools (merge, split, compress, etc.) work fine. Use Vercel, Netlify, Cloudflare Pages, or Docker+Nginx for full feature support.
+> Note: GitHub Pages does not support custom response headers (`SharedArrayBuffer` pthreads for heavy desktop WASM may be unavailable), while all standard PDF, AI Studio, Google Sign-In, and PayPal tools work without COOP/COEP restrictions.
 
 **Automatic Deployment:**
 1. Enable GitHub Pages in repository settings
@@ -165,9 +165,6 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-    # Required for SharedArrayBuffer (LibreOffice WASM pthreads)
-    add_header Cross-Origin-Opener-Policy "same-origin" always;
-    add_header Cross-Origin-Embedder-Policy "require-corp" always;
     add_header Cross-Origin-Resource-Policy "cross-origin" always;
 
     # IMPORTANT: Nginx's add_header in a location block overrides ALL
@@ -179,8 +176,6 @@ server {
         expires 1y;
         add_header Cache-Control "public, max-age=31536000, immutable";
         add_header X-Content-Type-Options "nosniff" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
         add_header Cross-Origin-Resource-Policy "cross-origin" always;
     }
 
@@ -196,8 +191,6 @@ server {
             application/octet-stream data;
         }
         add_header X-Content-Type-Options "nosniff" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
         add_header Cross-Origin-Resource-Policy "cross-origin" always;
     }
 
@@ -207,8 +200,6 @@ server {
         add_header Cache-Control "public, max-age=0, must-revalidate";
         add_header X-Content-Type-Options "nosniff" always;
         add_header X-Frame-Options "SAMEORIGIN" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
         add_header Cross-Origin-Resource-Policy "cross-origin" always;
     }
 
@@ -254,9 +245,6 @@ Header set X-Frame-Options "SAMEORIGIN"
 Header set X-XSS-Protection "1; mode=block"
 Header set Referrer-Policy "strict-origin-when-cross-origin"
 Header set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-# Required for SharedArrayBuffer (LibreOffice WASM pthreads)
-Header set Cross-Origin-Opener-Policy "same-origin"
-Header set Cross-Origin-Embedder-Policy "require-corp"
 Header set Cross-Origin-Resource-Policy "cross-origin"
 ```
 
@@ -281,9 +269,7 @@ aws cloudfront create-invalidation --distribution-id YOUR_DIST_ID --paths "/*"
 - Set error document to `404.html`
 
 **CloudFront Response Headers Policy:**
-Create a response headers policy with these custom headers to enable SharedArrayBuffer:
-- `Cross-Origin-Opener-Policy: same-origin`
-- `Cross-Origin-Embedder-Policy: require-corp`
+Create a response headers policy with this header:
 - `Cross-Origin-Resource-Policy: cross-origin`
 
 Attach this policy to your CloudFront distribution's behavior settings.
@@ -345,14 +331,6 @@ Configure `firebase.json`:
           {
             "key": "Permissions-Policy",
             "value": "camera=(), microphone=(), geolocation=()"
-          },
-          {
-            "key": "Cross-Origin-Opener-Policy",
-            "value": "same-origin"
-          },
-          {
-            "key": "Cross-Origin-Embedder-Policy",
-            "value": "require-corp"
           },
           {
             "key": "Cross-Origin-Resource-Policy",
@@ -554,16 +532,12 @@ The converter requests **uncompressed paths** (`soffice.wasm`, `soffice.data`). 
 | **Cloudflare Pages** | Same as Vercel/Netlify, with `_headers` file for COOP/COEP |
 | **Apache** | `mod_deflate` compresses on-the-fly, `AddType application/wasm .wasm` sets MIME type |
 
-### Required Headers
+### Recommended Headers
 
-All platforms must return these headers for LibreOffice WASM to work (required for `SharedArrayBuffer`):
+Keep third-party popups (Google Auth) and payment embeds (PayPal) unblocked by omitting strict COOP/COEP headers and sending:
 ```
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Resource-Policy: cross-origin
 ```
-
-These are pre-configured in all deployment files (`vercel.json`, `netlify.toml`, `_headers`, `nginx.conf`, `.htaccess`, `middleware.ts`).
 
 ---
 
@@ -590,11 +564,9 @@ Content-Type: application/wasm
 2. Your server sends `Content-Type: application/wasm` for `.wasm` files
 3. For Nginx: use `gzip_static on` so Nginx can auto-serve the `.gz` version to gzip-capable clients while keeping the correct MIME type
 
-### Issue: LibreOffice WASM stuck on `wasm-instantiate` / SharedArrayBuffer not available
-**Solution:** LibreOffice WASM uses Emscripten pthreads (multi-threading), which requires `SharedArrayBuffer`. Browsers only enable `SharedArrayBuffer` in [Cross-Origin Isolated](https://web.dev/cross-origin-isolation-guide/) contexts. Your server **must** return these headers on **all** responses (HTML pages, JS, WASM):
+### Issue: Cross-origin popups or PayPal scripts blocked
+**Solution:** Ensure no proxy, CDN, or custom hosting rule injects `Cross-Origin-Opener-Policy: same-origin` or `Cross-Origin-Embedder-Policy: require-corp`, and keep `Cross-Origin-Resource-Policy: cross-origin` only:
 ```
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Resource-Policy: cross-origin
 ```
 

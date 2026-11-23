@@ -154,8 +154,6 @@ stdenv.mkDerivation {
           add_header X-Frame-Options "SAMEORIGIN" always;
           add_header X-XSS-Protection "1; mode=block" always;
           add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-          add_header Cross-Origin-Opener-Policy "same-origin" always;
-          add_header Cross-Origin-Embedder-Policy "require-corp" always;
           add_header Cross-Origin-Resource-Policy "cross-origin" always;
 
           location ~* \.(ico|jpg|jpeg|png|gif|svg|webp|avif|woff|woff2|ttf|eot)$ {
