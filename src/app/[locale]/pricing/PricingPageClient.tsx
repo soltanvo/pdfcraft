@@ -84,6 +84,17 @@ function PlanPayPalCheckout({
   const [{ isPending, isRejected }] = usePayPalScriptReducer();
   const [busy, setBusy] = useState(false);
   const isArabic = locale === 'ar';
+  const hasPayPalClientId = Boolean((process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim());
+
+  if (!hasPayPalClientId) {
+    return (
+      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs text-center">
+        {isArabic
+          ? 'بوابة PayPal غير مفعّلة بعد. أضف NEXT_PUBLIC_PAYPAL_CLIENT_ID في إعدادات البيئة.'
+          : 'PayPal checkout is not configured. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID in environment variables.'}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2.5">
@@ -112,7 +123,7 @@ function PlanPayPalCheckout({
       {isRejected && (
         <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs text-center">
           {isArabic
-            ? 'تعذر تحميل أزرار PayPal. تحقق من NEXT_PUBLIC_PAYPAL_CLIENT_ID.'
+            ? 'تعذر تحميل أزرار PayPal. تحقق من صلاحية NEXT_PUBLIC_PAYPAL_CLIENT_ID.'
             : 'Could not load PayPal buttons. Check NEXT_PUBLIC_PAYPAL_CLIENT_ID.'}
         </div>
       )}
@@ -209,14 +220,15 @@ export function PricingPageClient({ locale }: { locale: string }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || 'sb';
+  const paypalClientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "").trim();
 
   return (
     <PayPalScriptProvider
+      deferLoading={!paypalClientId}
       options={{
-        clientId: paypalClientId,
-        currency: 'USD',
-        intent: 'capture',
+        clientId: (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "").trim(),
+        currency: "USD",
+        intent: "capture",
       }}
     >
       <div className="min-h-[calc(100vh-4rem)] bg-gray-50 py-14 px-4 sm:px-6 lg:px-8">

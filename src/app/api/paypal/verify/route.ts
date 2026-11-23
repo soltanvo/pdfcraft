@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid orderId or planId' }, { status: 400 });
     }
 
-    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-    const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+    const clientId = (process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim();
+    const clientSecret = (process.env.PAYPAL_CLIENT_SECRET || '').trim();
 
     // If PayPal server secret is not configured in preview, validate input shape cleanly
     if (!clientId || !clientSecret) {
@@ -32,39 +32,48 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const baseUrl =
-      process.env.PAYPAL_API_BASE ||
-      (clientId.startsWith('sb') || process.env.NODE_ENV !== 'production'
-        ? 'https://api-m.sandbox.paypal.com'
-        : 'https://api-m.paypal.com');
+    const candidateBases = process.env.PAYPAL_API_BASE
+      ? [process.env.PAYPAL_API_BASE.trim()]
+      : process.env.NODE_ENV === 'production'
+      ? ['https://api-m.paypal.com', 'https://api-m.sandbox.paypal.com']
+      : ['https://api-m.sandbox.paypal.com', 'https://api-m.paypal.com'];
 
     const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const tokenRes = await fetch(`${baseUrl}/v1/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: 'grant_type=client_credentials',
-    });
+    let baseUrl = candidateBases[0];
+    let accessToken: string | undefined;
 
-    if (!tokenRes.ok) {
+    for (const candidate of candidateBases) {
+      const tokenRes = await fetch(`${candidate}/v1/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'grant_type=client_credentials',
+      });
+
+      if (tokenRes.ok) {
+        const tokenData = (await tokenRes.json()) as { access_token?: string };
+        if (tokenData.access_token) {
+          baseUrl = candidate;
+          accessToken = tokenData.access_token;
+          break;
+        }
+      }
+    }
+
+    if (!accessToken) {
       return NextResponse.json(
         { error: 'PayPal authentication failed on server' },
         { status: 502 }
       );
     }
 
-    const tokenData = (await tokenRes.json()) as { access_token?: string };
-    if (!tokenData.access_token) {
-      return NextResponse.json({ error: 'Missing PayPal access token' }, { status: 502 });
-    }
-
     const orderRes = await fetch(
       `${baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}`,
       {
         headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       }
