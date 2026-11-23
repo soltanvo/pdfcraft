@@ -54,6 +54,7 @@ interface AuthContextValue {
   loading: boolean;
   authBusy: boolean;
   error: string | null;
+  clearError: () => void;
   signInWithGoogle: () => Promise<User | null>;
   logout: () => Promise<void>;
   deductCredit: () => Promise<void>;
@@ -277,6 +278,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -286,12 +291,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       authBusy,
       error,
+      clearError,
       signInWithGoogle,
       logout,
       deductCredit,
       addPaidCredits,
     }),
-    [user, profile, loading, authBusy, error, signInWithGoogle, logout, deductCredit, addPaidCredits]
+    [user, profile, loading, authBusy, error, clearError, signInWithGoogle, logout, deductCredit, addPaidCredits]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

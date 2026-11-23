@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Coins, Globe, LogIn, LogOut, Menu, User as UserIcon, X } from 'lucide-react';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from 'firebase/auth';
+import { AlertCircle, Coins, Globe, LogIn, LogOut, Menu, User as UserIcon, X } from 'lucide-react';
 import { useState } from 'react';
 import { locales, localeConfig, type Locale } from '@/lib/i18n/config';
+import { auth } from '@/lib/firebase/config';
 import { BrandLogo } from './BrandLogo';
 import { useAuth } from './AuthProvider';
 
@@ -14,9 +16,13 @@ export function Header({ locale }: { locale: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, profile, credits, loading, authBusy, signInWithGoogle, logout } = useAuth();
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
+  const { user, profile, credits, loading, authBusy, error, clearError, logout } = useAuth();
 
   const isArabic = locale === 'ar';
+  const busy = authBusy || signingIn;
+  const activeError = localError || error;
 
   const navItems = [
     { href: `/${locale}`, label: isArabic ? 'الرئيسية' : t('navigation.home') },
@@ -34,6 +40,63 @@ export function Header({ locale }: { locale: string }) {
       segments.unshift(nextLocale);
     }
     router.push('/' + segments.join('/'));
+  };
+
+  const handleDirectGoogleSignIn = async () => {
+    setLocalError(null);
+    clearError();
+    setSigningIn(true);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err: unknown) {
+      console.error('Google signInWithPopup error:', err);
+      const code = (err as { code?: string })?.code;
+      const message = err instanceof Error ? err.message : '';
+      const isPopupBlocked =
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-browser' ||
+        (/popup/i.test(message) && /block/i.test(message));
+
+      if (isPopupBlocked) {
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: unknown) {
+          console.error('Google signInWithRedirect error:', redirectErr);
+          setLocalError(
+            redirectErr instanceof Error
+              ? redirectErr.message
+              : isArabic
+              ? 'تعذر فتح صفحة تسجيل الدخول بجوجل.'
+              : 'Could not open Google sign-in redirect.'
+          );
+          return;
+        }
+      }
+
+      if (code === 'auth/unauthorized-domain') {
+        setLocalError(
+          isArabic
+            ? 'هذا النطاق غير مضاف في Authorized domains داخل Firebase Authentication. أضف النطاق أو استخدم النطاق الرسمي.'
+            : 'This domain is not authorized in Firebase Authentication Authorized Domains.'
+        );
+      } else if (code === 'auth/popup-closed-by-user') {
+        setLocalError(
+          isArabic
+            ? 'تم إغلاق نافذة تسجيل الدخول قبل إتمام العملية.'
+            : 'Sign-in popup was closed before completing login.'
+        );
+      } else {
+        setLocalError(
+          message ||
+            (isArabic ? 'حدث خطأ أثناء تسجيل الدخول بحساب Google.' : 'Google sign-in failed.')
+        );
+      }
+    } finally {
+      setSigningIn(false);
+    }
   };
 
   return (
@@ -116,7 +179,7 @@ export function Header({ locale }: { locale: string }) {
               <button
                 type="button"
                 onClick={() => void logout()}
-                disabled={authBusy}
+                disabled={busy}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -126,8 +189,8 @@ export function Header({ locale }: { locale: string }) {
           ) : (
             <button
               type="button"
-              onClick={() => void signInWithGoogle()}
-              disabled={authBusy}
+              onClick={() => void handleDirectGoogleSignIn()}
+              disabled={busy}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60"
             >
               <LogIn className="w-4 h-4" />
@@ -145,6 +208,28 @@ export function Header({ locale }: { locale: string }) {
           </button>
         </div>
       </div>
+
+      {activeError && (
+        <div className="bg-rose-50 border-b border-rose-200 px-4 py-2 text-xs font-medium text-rose-800 whitespace-normal">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{activeError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLocalError(null);
+                clearError();
+              }}
+              aria-label="Dismiss error"
+              className="p-1 rounded hover:bg-rose-100 text-rose-700 cursor-pointer shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {mobileOpen && (
         <div className="lg:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1 shadow-lg">

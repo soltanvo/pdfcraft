@@ -1,28 +1,48 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, type Auth } from 'firebase/auth';
+import { getAuth, type Auth } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore, type Firestore } from 'firebase/firestore';
+import defaultFirebaseConfig from '../../../firebase-applet-config.json';
 
-const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
+const envApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
+const envAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
+const envProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
+const envStorageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim();
+const envMessagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim();
+const envAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim();
+
+const hasCoreEnvConfig = Boolean(envApiKey && envAuthDomain && envProjectId);
+
+const firebaseConfig: FirebaseOptions = hasCoreEnvConfig
+  ? {
+      apiKey: envApiKey,
+      authDomain: envAuthDomain,
+      projectId: envProjectId,
+      ...(envStorageBucket ? { storageBucket: envStorageBucket } : {}),
+      ...(envMessagingSenderId ? { messagingSenderId: envMessagingSenderId } : {}),
+      ...(envAppId ? { appId: envAppId } : {}),
+    }
+  : {
+      apiKey: defaultFirebaseConfig.apiKey,
+      authDomain: defaultFirebaseConfig.authDomain,
+      projectId: defaultFirebaseConfig.projectId,
+      storageBucket: defaultFirebaseConfig.storageBucket,
+      messagingSenderId: defaultFirebaseConfig.messagingSenderId,
+      appId: defaultFirebaseConfig.appId,
+    };
 
 export const isFirebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.projectId
+  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId
 );
 
-export const firebaseApp: FirebaseApp | null = isFirebaseConfigured
-  ? getApps().length > 0
-    ? getApp()
-    : initializeApp(firebaseConfig)
-  : null;
+export const firebaseApp: FirebaseApp =
+  getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-export const auth: Auth | null = firebaseApp ? getAuth(firebaseApp) : null;
-export const db: Firestore | null = firebaseApp ? getFirestore(firebaseApp) : null;
+export const auth: Auth = getAuth(firebaseApp);
+
+// Use default Firestore DB when custom env vars are provided; use provisioned DB ID for fallback project config
+export const db: Firestore = hasCoreEnvConfig
+  ? getFirestore(firebaseApp)
+  : getFirestore(firebaseApp, defaultFirebaseConfig.firestoreDatabaseId);
 
 export enum OperationType {
   CREATE = 'create',
@@ -58,13 +78,13 @@ export function handleFirestoreError(
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth?.currentUser?.uid,
-      email: auth?.currentUser?.email,
-      emailVerified: auth?.currentUser?.emailVerified,
-      isAnonymous: auth?.currentUser?.isAnonymous,
-      tenantId: auth?.currentUser?.tenantId,
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
       providerInfo:
-        auth?.currentUser?.providerData?.map((provider) => ({
+        auth.currentUser?.providerData?.map((provider) => ({
           providerId: provider.providerId,
           email: provider.email,
         })) || [],
@@ -79,7 +99,7 @@ export function handleFirestoreError(
 let connectionTested = false;
 
 export async function testFirestoreConnection(): Promise<void> {
-  if (connectionTested || typeof window === 'undefined' || !db) return;
+  if (connectionTested || typeof window === 'undefined') return;
   connectionTested = true;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
