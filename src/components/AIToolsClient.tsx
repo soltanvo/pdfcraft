@@ -45,9 +45,9 @@ function SafeMarkdownView({ content }: { content: string }) {
   const codeMatches = content.match(/```[\s\S]*?```/g) || [];
 
   return (
-    <div className="space-y-3 text-sm leading-7 text-slate-800">
+    <div className="space-y-4 text-base font-medium leading-8 text-slate-800">
       {blocks.map((block, bIdx) => (
-        <div key={bIdx} className="space-y-2.5">
+        <div key={bIdx} className="space-y-3">
           {block
             .split('\n')
             .filter((line, idx, arr) => !(line === '' && arr[idx - 1] === ''))
@@ -56,28 +56,28 @@ function SafeMarkdownView({ content }: { content: string }) {
               if (!trimmed) return null;
               if (trimmed.startsWith('### ')) {
                 return (
-                  <h4 key={lIdx} className="text-base font-bold text-slate-900 pt-2">
+                  <h4 key={lIdx} className="text-lg font-bold text-slate-900 pt-2">
                     {trimmed.slice(4)}
                   </h4>
                 );
               }
               if (trimmed.startsWith('## ')) {
                 return (
-                  <h3 key={lIdx} className="text-lg font-bold text-slate-900 pt-2">
+                  <h3 key={lIdx} className="text-xl font-bold text-slate-900 pt-2">
                     {trimmed.slice(3)}
                   </h3>
                 );
               }
               if (trimmed.startsWith('# ')) {
                 return (
-                  <h2 key={lIdx} className="text-xl font-extrabold text-slate-900 pt-2">
+                  <h2 key={lIdx} className="text-2xl font-extrabold text-slate-900 pt-2">
                     {trimmed.slice(2)}
                   </h2>
                 );
               }
               if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
                 return (
-                  <div key={lIdx} className="flex items-start gap-2 ps-2">
+                  <div key={lIdx} className="flex items-start gap-2.5 ps-2">
                     <span className="text-amber-600 font-bold mt-0.5">•</span>
                     <span>{trimmed.slice(2).replace(/\*\*/g, '')}</span>
                   </div>
@@ -380,17 +380,17 @@ export function AIToolsClient({ locale }: { locale: string }) {
   };
 
   return (
-    <div dir="ltr" className="flex flex-col lg:flex-row w-full bg-white">
+    <div dir="ltr" className="flex flex-col md:flex-row w-full bg-white min-h-[calc(100vh-4rem)]">
       {/* Left Physical Bolt.new-style Chat Column */}
       <aside
         dir={contentDir}
-        className="h-[calc(100vh-4rem)] w-full lg:w-[430px] border-r border-slate-200 flex flex-col bg-white shrink-0"
+        className="h-[calc(100vh-4rem)] w-full md:w-[380px] shrink-0 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-white"
       >
         {/* Chat Column Top Bar */}
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
+        <div className="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <h1 className="font-bold text-sm text-slate-900 truncate">
+            <h1 className="font-bold text-base text-slate-900 truncate">
               {isArabic ? 'مساعد SA AI الذكي' : 'SA AI Studio'}
             </h1>
           </div>
@@ -434,31 +434,31 @@ export function AIToolsClient({ locale }: { locale: string }) {
         {/* Chat Messages Scroll Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
-            <div className="space-y-4 pt-4">
+            <div className="space-y-5 pt-2">
               <div className="rounded-xl border border-slate-200 bg-gray-50 p-4 space-y-2">
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-base font-bold text-slate-900">
                   {isArabic
                     ? 'مرحباً بك في استوديو SA AI'
                     : 'Welcome to SA AI Studio'}
                 </p>
-                <p className="text-xs leading-relaxed text-slate-600">
+                <p className="text-sm sm:text-base leading-relaxed text-slate-600">
                   {isArabic
                     ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اكتب طلبك لتحليله فوراً بنموذج Gemini 2.0 Flash (نقطة واحدة لكل رسالة).'
                     : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or type your prompt to analyze with Gemini 2.0 Flash (1 credit per response).'}
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500">
+              <div className="space-y-2.5">
+                <p className="text-base font-bold text-slate-700">
                   {isArabic ? 'أوامر سريعة:' : 'Quick prompts:'}
                 </p>
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-2.5">
                   {quickPrompts.map((qp) => (
                     <button
                       key={qp}
                       type="button"
                       onClick={() => void handleSend(qp)}
-                      className="text-start px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-xs font-medium text-slate-700 transition-colors cursor-pointer"
+                      className="text-start px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-base font-medium leading-relaxed text-slate-800 transition-colors cursor-pointer"
                     >
                       {qp}
                     </button>
@@ -473,21 +473,21 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 onClick={() => {
                   if (m.role === 'assistant') setActiveResultId(m.id);
                 }}
-                className={`rounded-xl p-3.5 text-xs leading-relaxed border transition-colors ${
+                className={`rounded-xl p-4 text-base font-medium leading-relaxed border transition-colors ${
                   m.role === 'user'
-                    ? 'bg-slate-900 text-white border-slate-900 ms-6'
+                    ? 'bg-slate-900 text-white border-slate-900 ms-4'
                     : activeResult?.id === m.id
-                    ? 'bg-amber-50/60 text-slate-800 border-amber-300 me-4 cursor-pointer'
-                    : 'bg-gray-50 text-slate-800 border-slate-200 me-4 cursor-pointer hover:border-slate-300'
+                    ? 'bg-amber-50/60 text-slate-900 border-amber-300 me-3 cursor-pointer'
+                    : 'bg-gray-50 text-slate-900 border-slate-200 me-3 cursor-pointer hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 mb-1 opacity-75 text-[11px] font-semibold">
+                <div className="flex items-center justify-between gap-2 mb-1.5 opacity-75 text-xs font-semibold">
                   <span>{m.role === 'user' ? (isArabic ? 'أنت' : 'You') : 'SA AI'}</span>
                   <span className="tabular-nums">{m.timestamp}</span>
                 </div>
                 {m.attachmentName && (
-                  <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1.5 text-[11px]">
-                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <div className="mb-2 flex items-center gap-2 rounded-lg bg-white/10 px-2.5 py-1.5 text-sm">
+                    <FileText className="w-4 h-4 shrink-0" />
                     <span className="truncate">{m.attachmentName}</span>
                   </div>
                 )}
@@ -497,8 +497,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
           )}
 
           {isLoading && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl border border-blue-200 bg-blue-50/60 text-blue-800 text-xs font-medium">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            <div className="flex items-center gap-2.5 p-3.5 rounded-xl border border-blue-200 bg-blue-50/60 text-blue-800 text-base font-medium">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
               <span>{isArabic ? 'SA AI يقوم بتحليل طلبك الآن...' : 'SA AI is analyzing...'}</span>
             </div>
           )}
@@ -613,7 +613,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                       ? 'اسأل SA AI أو اطلب تحليل الملف المرفق...'
                       : 'Ask SA AI or analyze an attached file...'
                   }
-                  className="flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                  className="flex-1 resize-none border-0 bg-transparent px-2 py-2 text-base font-medium leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 />
 
                 <button

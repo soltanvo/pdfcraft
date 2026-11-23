@@ -14,8 +14,11 @@ export function BrandLogo() {
         className="inline-flex items-center whitespace-nowrap text-xl sm:text-2xl tracking-tight select-none"
       >
         <span className="font-black text-slate-900">SA</span>
-        <span className="sa-gold-divider font-bold mx-1.5" aria-hidden="true">
-          |
+        <span
+          className="sa-gold-sparkle mx-1.5 inline-flex items-center justify-center text-lg sm:text-xl leading-none"
+          aria-hidden="true"
+        >
+          ✦
         </span>
         <span className="sa-ai-3d-gold font-black">AI</span>
       </span>

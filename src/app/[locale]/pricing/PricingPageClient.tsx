@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
+import {
+  PayPalButtons,
+  PayPalScriptProvider,
+  usePayPalScriptReducer,
+} from '@paypal/react-paypal-js';
 import { Check, CheckCircle2, Coins, Crown, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -77,6 +81,7 @@ function PlanPayPalCheckout({
   onError: (msg: string) => void;
 }) {
   const { user, signInWithGoogle, addPaidCredits } = useAuth();
+  const [{ isPending, isRejected }] = usePayPalScriptReducer();
   const [busy, setBusy] = useState(false);
   const isArabic = locale === 'ar';
 
@@ -100,7 +105,20 @@ function PlanPayPalCheckout({
         </div>
       )}
 
+      {isPending && (
+        <div className="h-11 w-full rounded-xl bg-slate-100 animate-pulse" />
+      )}
+
+      {isRejected && (
+        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs text-center">
+          {isArabic
+            ? 'تعذر تحميل أزرار PayPal. تحقق من NEXT_PUBLIC_PAYPAL_CLIENT_ID.'
+            : 'Could not load PayPal buttons. Check NEXT_PUBLIC_PAYPAL_CLIENT_ID.'}
+        </div>
+      )}
+
       <PayPalButtons
+        forceReRender={[user?.uid ?? 'guest', plan.id, plan.price]}
         style={{
           layout: 'vertical',
           color: plan.popular ? 'gold' : 'blue',
@@ -268,9 +286,9 @@ export function PricingPageClient({ locale }: { locale: string }) {
           )}
 
           {/* 3 White Pricing Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-7 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto items-stretch">
             {/* 1. Free Plan ($0) */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 lg:p-7 flex flex-col justify-between">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">
@@ -329,7 +347,7 @@ export function PricingPageClient({ locale }: { locale: string }) {
             {PAID_PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`bg-white rounded-2xl p-8 flex flex-col justify-between relative ${
+                className={`bg-white rounded-2xl p-6 lg:p-7 flex flex-col justify-between relative ${
                   plan.popular
                     ? 'border-2 border-amber-400 shadow-lg'
                     : 'border border-slate-200 shadow-sm'

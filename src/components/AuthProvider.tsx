@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
   signOut,
@@ -28,7 +29,6 @@ import {
 import {
   auth,
   db,
-  googleProvider,
   handleFirestoreError,
   OperationType,
   testFirestoreConnection,
@@ -68,11 +68,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!auth || !db) {
+      setLoading(false);
+      return;
+    }
+
+    const activeAuth = auth;
+    const activeDb = db;
+
     void testFirestoreConnection();
 
     let unsubscribeDoc: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(activeAuth, async (firebaseUser) => {
       if (unsubscribeDoc) {
         unsubscribeDoc();
         unsubscribeDoc = null;
@@ -88,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const userPath = `users/${firebaseUser.uid}`;
-      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userRef = doc(activeDb, 'users', firebaseUser.uid);
 
       try {
         const snap = await getDoc(userRef);
@@ -150,10 +158,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<User | null> => {
+    if (!auth) {
+      setError('Firebase environment variables (NEXT_PUBLIC_FIREBASE_*) are not configured.');
+      return null;
+    }
     setAuthBusy(true);
     setError(null);
     try {
-      const cred = await signInWithPopup(auth, googleProvider);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const cred = await signInWithPopup(auth, provider);
       return cred.user;
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
@@ -168,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (!auth) return;
     setAuthBusy(true);
     try {
       await signOut(auth);
@@ -178,6 +193,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deductCredit = useCallback(async () => {
+    if (!auth || !db) {
+      throw new Error('Firebase is not configured');
+    }
     const activeUser = auth.currentUser;
     if (!activeUser) {
       throw new Error('Authentication required');
@@ -195,6 +213,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addPaidCredits = useCallback(async (planId: 'starter' | 'pro', orderId: string) => {
+    if (!auth || !db) {
+      throw new Error('Firebase is not configured');
+    }
     const activeUser = auth.currentUser;
     if (!activeUser) {
       throw new Error('Please sign in first to apply credits.');

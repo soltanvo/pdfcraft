@@ -57,9 +57,14 @@ body {
           drop-shadow(0 2px 3px rgba(245, 158, 11, 0.35));
 }
 
-.sa-gold-divider {
-  color: #f59e0b;
-  text-shadow: 0 0 10px rgba(245, 158, 11, 0.85), 0 0 18px rgba(251, 191, 36, 0.55);
+.sa-gold-sparkle {
+  background: linear-gradient(135deg, #fef08a 0%, #fbbf24 40%, #f59e0b 75%, #b45309 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(146, 64, 14, 0.5))
+          drop-shadow(0 0 8px rgba(251, 191, 36, 0.7))
+          drop-shadow(0 0 14px rgba(245, 158, 11, 0.4));
 }
 
 /* Bolt.new-style Animated Conic Gradient Glowing Border (Gold & Blue) */
@@ -76,25 +81,28 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 1rem;
-  padding: 2px;
+  padding: 3px;
+  box-shadow:
+    0 0 18px rgba(245, 158, 11, 0.25),
+    0 0 24px rgba(37, 99, 235, 0.2);
 }
 
 .sa-glow-border-spinner {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 220%;
-  height: 220%;
+  width: 240%;
+  height: 240%;
   background: conic-gradient(
     from 0deg,
     #2563eb 0deg,
-    #38bdf8 60deg,
-    #f59e0b 140deg,
-    #fde047 190deg,
-    #2563eb 270deg,
+    #38bdf8 65deg,
+    #f59e0b 145deg,
+    #fde047 205deg,
+    #2563eb 285deg,
     #1d4ed8 360deg
   );
-  animation: sa-conic-rotate 2.4s linear infinite;
+  animation: sa-conic-rotate 7s linear infinite;
   pointer-events: none;
   z-index: 0;
 }
