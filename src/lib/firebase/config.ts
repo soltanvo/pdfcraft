@@ -18,7 +18,7 @@ const hasEnvApiKey = Boolean(envApiKey);
 const firebaseConfig: FirebaseOptions = hasEnvApiKey
   ? {
       apiKey: envApiKey,
-      authDomain: 'as-pdf-78355.firebaseapp.com',
+      authDomain: typeof window !== 'undefined' ? window.location.host : 'sa-ai-roan.vercel.app',
       projectId: 'as-pdf-78355',
       storageBucket: envStorageBucket || 'as-pdf-78355.firebasestorage.app',
       ...(envMessagingSenderId ? { messagingSenderId: envMessagingSenderId } : {}),

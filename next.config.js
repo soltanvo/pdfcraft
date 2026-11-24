@@ -115,8 +115,8 @@ const nextConfig = {
     },
   },
 
-  // Trailing slash for static hosting compatibility
-  trailingSlash: true,
+  // Keep canonical paths without forced trailing slash so /__/auth/* rewrites and /api/* webhooks do not 308-redirect
+  trailingSlash: false,
 
   // Strict mode for better development experience
   reactStrictMode: true,
@@ -232,7 +232,7 @@ const nextConfig = {
         ],
       },
       {
-        // Global security & caching headers for all routes (COOP/COEP removed so Google OAuth popup and Paddle checkout are never blocked)
+        // Global security & caching headers for all routes (COOP same-origin-allow-popups; COEP omitted for Paddle CDN compatibility)
         source: '/:path*',
         headers: [
           {
@@ -248,10 +248,23 @@ const nextConfig = {
             value: 'strict-origin-when-cross-origin',
           },
           {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+          {
             key: 'Cross-Origin-Resource-Policy',
             value: 'cross-origin',
           },
         ],
+      },
+    ];
+  },
+
+  async rewrites() {
+    return [
+      {
+        source: '/__/auth/:path*',
+        destination: 'https://as-pdf-78355.firebaseapp.com/__/auth/:path*',
       },
     ];
   },
