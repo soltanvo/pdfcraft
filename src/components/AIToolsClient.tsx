@@ -19,7 +19,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
+import { db } from '@/lib/firebase/config';
 import { extractPdfTextByPage, renderPdfPageToCanvas } from '@/lib/pdf/pdfjs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
@@ -226,7 +228,8 @@ function SafeMarkdownView({ content }: { content: string }) {
 export function AIToolsClient({ locale }: { locale: string }) {
   const isArabic = locale === 'ar';
   const contentDir = locale === 'ar' || locale === 'he' ? 'rtl' : 'ltr';
-  const { user, credits, isPaid, signInWithGoogle, deductCredit } = useAuth();
+  const { user, profile, credits, firestoreOffline, isPaid, signInWithGoogle, deductCredit } =
+    useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -332,6 +335,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
   };
 
   const handleSend = async (customPrompt?: string) => {
+    if (isLoading) return;
     const promptText = (customPrompt ?? input).trim();
     if (!promptText && !attached) return;
 
@@ -340,7 +344,31 @@ export function AIToolsClient({ locale }: { locale: string }) {
       return;
     }
 
-    if (credits < 1) {
+    // Never block /api/ai if Firestore is offline or throws "client is offline"
+    let confirmedZeroCredits = false;
+    try {
+      if (profile && !firestoreOffline) {
+        confirmedZeroCredits = credits < 1;
+      } else if (db && !firestoreOffline) {
+        const snap = await Promise.race([
+          getDoc(doc(db, 'users', user.uid)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+        ]);
+        if (snap && snap.exists()) {
+          const remoteCredits = snap.data()?.credits;
+          if (typeof remoteCredits === 'number' && remoteCredits < 1) {
+            confirmedZeroCredits = true;
+          }
+        }
+      }
+    } catch (firestoreErr) {
+      console.warn(
+        'Firestore credit check unavailable (proceeding with /api/ai):',
+        firestoreErr
+      );
+    }
+
+    if (confirmedZeroCredits) {
       setError(
         isArabic
           ? 'نفد رصيد النقاط لديك. يرجى شحن رصيدك من صفحة الباقات للمتابعة.'
@@ -494,7 +522,12 @@ export function AIToolsClient({ locale }: { locale: string }) {
         setActiveResultId(assistantId);
       }
 
-      await deductCredit();
+      try {
+        await deductCredit();
+      } catch (deductErr) {
+        console.warn('Firestore credit deduction failed (AI response kept):', deductErr);
+      }
+
       if (streamError) {
         setError(streamError);
       }
@@ -750,7 +783,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p>{error}</p>
-                {credits < 1 && user && (
+                {credits < 1 && user && !firestoreOffline && (
                   <Link
                     href={`/${locale}/pricing`}
                     className="inline-block font-bold text-rose-900 underline"
@@ -812,7 +845,13 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </div>
               )}
 
-              <div className="flex items-end gap-2">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSend();
+                }}
+                className="flex items-end gap-2"
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -845,7 +884,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       void handleSend();
                     }
@@ -859,9 +898,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 />
 
                 <button
-                  type="button"
-                  onClick={() => void handleSend()}
-                  disabled={isLoading || (!input.trim() && !attached)}
+                  type="submit"
+                  disabled={isLoading || extractingFile || (!input.trim() && !attached)}
                   className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                   aria-label="Send"
                 >
@@ -871,7 +909,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     <Send className="w-4 h-4" />
                   )}
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         </div>

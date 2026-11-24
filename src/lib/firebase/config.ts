@@ -1,6 +1,12 @@
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { doc, getDocFromServer, getFirestore, type Firestore } from 'firebase/firestore';
+import {
+  doc,
+  getDocFromServer,
+  getFirestore,
+  initializeFirestore,
+  type Firestore,
+} from 'firebase/firestore';
 import defaultFirebaseConfig from '../../../firebase-applet-config.json';
 
 function sanitizeEnv(value: string | undefined): string {
@@ -42,10 +48,31 @@ export const firebaseApp: FirebaseApp =
 
 export const auth: Auth = getAuth(firebaseApp);
 
+function createFirestoreInstance(app: FirebaseApp, databaseId?: string): Firestore {
+  try {
+    return databaseId
+      ? initializeFirestore(app, { experimentalForceLongPolling: true }, databaseId)
+      : initializeFirestore(app, { experimentalForceLongPolling: true });
+  } catch {
+    return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  }
+}
+
 // Use default Firestore DB for as-pdf-78355 when env API key is set; use provisioned DB ID for fallback project config
 export const db: Firestore = hasEnvApiKey
-  ? getFirestore(firebaseApp)
-  : getFirestore(firebaseApp, defaultFirebaseConfig.firestoreDatabaseId);
+  ? createFirestoreInstance(firebaseApp)
+  : createFirestoreInstance(firebaseApp, defaultFirebaseConfig.firestoreDatabaseId);
+
+export function isFirestoreOfflineError(error: unknown): boolean {
+  const code = (error as { code?: string })?.code;
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    code === 'unavailable' ||
+    /client is offline|failed to get document because the client is offline|network|offline/i.test(
+      message
+    )
+  );
+}
 
 export enum OperationType {
   CREATE = 'create',
@@ -108,7 +135,7 @@ export async function testFirestoreConnection(): Promise<void> {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
+      console.warn('Firestore connection check: client is offline.');
     }
   }
 }

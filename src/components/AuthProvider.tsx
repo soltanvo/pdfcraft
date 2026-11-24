@@ -31,6 +31,7 @@ import {
   auth,
   db,
   handleFirestoreError,
+  isFirestoreOfflineError,
   OperationType,
   testFirestoreConnection,
 } from '@/lib/firebase/config';
@@ -54,6 +55,7 @@ interface AuthContextValue {
   profile: UserProfile | null;
   credits: number;
   isPaid: boolean;
+  firestoreOffline: boolean;
   loading: boolean;
   authBusy: boolean;
   error: string | null;
@@ -69,6 +71,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [firestoreOffline, setFirestoreOffline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authBusy, setAuthBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const snap = await getDoc(userRef);
+        setFirestoreOffline(false);
         if (!snap.exists()) {
           const initialDoc = {
             uid: firebaseUser.uid,
@@ -133,17 +137,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await setDoc(userRef, initialDoc);
         }
       } catch (err) {
-        console.error('Failed to ensure user document:', err);
-        try {
-          handleFirestoreError(err, OperationType.WRITE, userPath);
-        } catch (wrapped) {
-          setError(wrapped instanceof Error ? wrapped.message : 'Firestore setup failed');
+        if (isFirestoreOfflineError(err)) {
+          console.warn('Firestore offline during user document check:', err);
+          setFirestoreOffline(true);
+        } else {
+          console.error('Failed to ensure user document:', err);
+          try {
+            handleFirestoreError(err, OperationType.WRITE, userPath);
+          } catch (wrapped) {
+            setError(wrapped instanceof Error ? wrapped.message : 'Firestore setup failed');
+          }
         }
       }
 
       unsubscribeDoc = onSnapshot(
         userRef,
         (snapshot) => {
+          setFirestoreOffline(false);
           if (snapshot.exists()) {
             const data = snapshot.data();
             const plan =
@@ -184,6 +194,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         (snapErr) => {
           setLoading(false);
+          if (isFirestoreOfflineError(snapErr)) {
+            console.warn('Firestore listener offline:', snapErr);
+            setFirestoreOffline(true);
+            return;
+          }
           try {
             handleFirestoreError(snapErr, OperationType.GET, userPath);
           } catch (wrapped) {
@@ -232,11 +247,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deductCredit = useCallback(async () => {
     if (!auth || !db) {
-      throw new Error('Firebase is not configured');
+      return;
     }
     const activeUser = auth.currentUser;
     if (!activeUser) {
-      throw new Error('Authentication required');
+      return;
     }
     const userPath = `users/${activeUser.uid}`;
     const userRef = doc(db, 'users', activeUser.uid);
@@ -245,7 +260,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credits: increment(-1),
         updatedAt: serverTimestamp(),
       });
+      setFirestoreOffline(false);
     } catch (err) {
+      if (isFirestoreOfflineError(err)) {
+        console.warn('Firestore offline during credit deduction; skipping deduction.');
+        setFirestoreOffline(true);
+        return;
+      }
       handleFirestoreError(err, OperationType.UPDATE, userPath);
     }
   }, []);
@@ -298,6 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       credits: profile?.credits ?? 0,
       isPaid: Boolean(profile?.isPaid),
+      firestoreOffline,
       loading,
       authBusy,
       error,
@@ -307,7 +329,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deductCredit,
       addPaidCredits,
     }),
-    [user, profile, loading, authBusy, error, clearError, signInWithGoogle, logout, deductCredit, addPaidCredits]
+    [
+      user,
+      profile,
+      firestoreOffline,
+      loading,
+      authBusy,
+      error,
+      clearError,
+      signInWithGoogle,
+      logout,
+      deductCredit,
+      addPaidCredits,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
