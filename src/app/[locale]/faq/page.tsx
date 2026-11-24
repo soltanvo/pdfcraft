@@ -28,7 +28,7 @@ export default async function FaqPage({
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
           {t('title')}
         </h1>
-        <p className="text-slate-600 dark:text-slate-400">{t('subtitle')}</p>
+        <p className="text-slate-600 dark:text-slate-400">{t('subtitle', { brand: 'SA AI' })}</p>
       </div>
 
       <div className="space-y-8">

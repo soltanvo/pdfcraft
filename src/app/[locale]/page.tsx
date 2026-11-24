@@ -224,7 +224,7 @@ export default async function HomePage({
               {t('features.powerful.title')}
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {t('features.powerful.description')}
+              {t('features.powerful.description', { count: TOOLS.length })}
             </p>
           </div>
         </div>
