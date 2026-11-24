@@ -87,7 +87,7 @@ export function PricingPageClient({ locale }: { locale: string }) {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim();
+    const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim().replace(/^["']+|["']+$/g, '').trim();
     if (!token) {
       return;
     }
@@ -148,7 +148,7 @@ export function PricingPageClient({ locale }: { locale: string }) {
 
       let activePaddle = paddle;
       if (!activePaddle) {
-        const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim();
+        const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim().replace(/^["']+|["']+$/g, '').trim();
         if (!token) {
           setErrorMsg(
             isArabic

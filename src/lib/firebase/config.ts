@@ -3,10 +3,15 @@ import { getAuth, type Auth } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore, type Firestore } from 'firebase/firestore';
 import defaultFirebaseConfig from '../../../firebase-applet-config.json';
 
-const envApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim();
-const envStorageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim();
-const envMessagingSenderId = process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim();
-const envAppId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim();
+function sanitizeEnv(value: string | undefined): string {
+  if (!value) return '';
+  return value.trim().replace(/^["']+|["']+$/g, '').trim();
+}
+
+const envApiKey = sanitizeEnv(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+const envStorageBucket = sanitizeEnv(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+const envMessagingSenderId = sanitizeEnv(process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID);
+const envAppId = sanitizeEnv(process.env.NEXT_PUBLIC_FIREBASE_APP_ID);
 
 const hasEnvApiKey = Boolean(envApiKey);
 
@@ -20,12 +25,12 @@ const firebaseConfig: FirebaseOptions = hasEnvApiKey
       ...(envAppId ? { appId: envAppId } : {}),
     }
   : {
-      apiKey: defaultFirebaseConfig.apiKey,
-      authDomain: defaultFirebaseConfig.authDomain,
-      projectId: defaultFirebaseConfig.projectId,
-      storageBucket: defaultFirebaseConfig.storageBucket,
-      messagingSenderId: defaultFirebaseConfig.messagingSenderId,
-      appId: defaultFirebaseConfig.appId,
+      apiKey: sanitizeEnv(defaultFirebaseConfig.apiKey),
+      authDomain: sanitizeEnv(defaultFirebaseConfig.authDomain),
+      projectId: sanitizeEnv(defaultFirebaseConfig.projectId),
+      storageBucket: sanitizeEnv(defaultFirebaseConfig.storageBucket),
+      messagingSenderId: sanitizeEnv(defaultFirebaseConfig.messagingSenderId),
+      appId: sanitizeEnv(defaultFirebaseConfig.appId),
     };
 
 export const isFirebaseConfigured = Boolean(
