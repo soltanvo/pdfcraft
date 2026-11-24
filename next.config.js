@@ -232,8 +232,7 @@ const nextConfig = {
         ],
       },
       {
-        // Global security & caching headers for all routes (allows Paddle v2 CDN/iframe & Google OAuth popups)
-        // Cross-Origin-Embedder-Policy is intentionally omitted so cdn.paddle.com/paddle/v2/paddle.js loads cleanly.
+        // Global security & caching headers for all routes (COOP/COEP removed so Google OAuth popup and Paddle checkout are never blocked)
         source: '/:path*',
         headers: [
           {
@@ -247,10 +246,6 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin-allow-popups',
           },
           {
             key: 'Cross-Origin-Resource-Policy',

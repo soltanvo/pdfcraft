@@ -77,6 +77,79 @@ const PAID_PLANS: PaidPlanConfig[] = [
   },
 ];
 
+function sanitizeEnv(value: string | undefined): string {
+  if (!value) return '';
+  return value.trim().replace(/^["']+|["']+$/g, '').trim();
+}
+
+function resolvePaddleConfig(): { token: string; environment: 'sandbox' | 'production' } {
+  const token = sanitizeEnv(process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN);
+  const explicitEnv = sanitizeEnv(process.env.NEXT_PUBLIC_PADDLE_ENV).toLowerCase();
+  const environment: 'sandbox' | 'production' =
+    explicitEnv === 'sandbox' || token.startsWith('test_') ? 'sandbox' : 'production';
+  return { token, environment };
+}
+
+type PaddleGlobal = Paddle & {
+  Initialized?: boolean;
+  Environment: { set: (env: 'sandbox' | 'production') => void };
+  Initialize: (opts: { token: string; eventCallback?: (event: { name?: string }) => void }) => void;
+  Update: (opts: { token: string; eventCallback?: (event: { name?: string }) => void }) => void;
+};
+
+async function loadPaddleScriptDirect(
+  token: string,
+  environment: 'sandbox' | 'production',
+  onCompleted: () => void
+): Promise<Paddle | null> {
+  if (typeof window === 'undefined') return null;
+
+  const win = window as unknown as {
+    PaddleBillingV1?: PaddleGlobal;
+    Paddle?: PaddleGlobal;
+  };
+
+  let instance = win.PaddleBillingV1 || win.Paddle;
+  if (!instance) {
+    const cdnUrl = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+    const existing = document.querySelector(`script[src="${cdnUrl}"]`);
+    if (existing) {
+      existing.remove();
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = cdnUrl;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Paddle.js from cdn.paddle.com'));
+      (document.head || document.body).appendChild(script);
+    });
+
+    instance = win.PaddleBillingV1 || win.Paddle;
+  }
+
+  if (!instance) {
+    return null;
+  }
+
+  instance.Environment.set(environment);
+  const initOpts = {
+    token,
+    eventCallback(event: { name?: string }) {
+      if (event.name === 'checkout.completed') {
+        onCompleted();
+      }
+    },
+  };
+  if (instance.Initialized) {
+    instance.Update(initOpts);
+  } else {
+    instance.Initialize(initOpts);
+  }
+  return instance;
+}
+
 export function PricingPageClient({ locale }: { locale: string }) {
   const isArabic = locale === 'ar';
   const { user, profile, credits, isPaid, signInWithGoogle } = useAuth();
@@ -87,40 +160,63 @@ export function PricingPageClient({ locale }: { locale: string }) {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim().replace(/^["']+|["']+$/g, '').trim();
+    const { token, environment } = resolvePaddleConfig();
     if (!token) {
       return;
     }
 
     let cancelled = false;
-    initializePaddle({
-      environment: 'production',
-      token,
-      eventCallback(event) {
-        if (event.name === 'checkout.completed') {
-          setSuccessMsg(
-            isArabic
-              ? 'تم إتمام الاشتراك بنجاح! سيتم تفعيل الباقة وتحديث حسابك خلال لحظات.'
-              : 'Subscription payment complete! Your plan and credits are activating now.'
-          );
+    const handleCompleted = () => {
+      setSuccessMsg(
+        isArabic
+          ? 'تم إتمام الاشتراك بنجاح! سيتم تفعيل الباقة وتحديث حسابك خلال لحظات.'
+          : 'Subscription payment complete! Your plan and credits are activating now.'
+      );
+    };
+
+    const bootPaddle = async () => {
+      try {
+        const instance = await initializePaddle({
+          environment,
+          token,
+          eventCallback(event) {
+            if (event.name === 'checkout.completed') {
+              handleCompleted();
+            }
+          },
+        });
+        if (instance) {
+          if (!cancelled) {
+            setPaddle(instance);
+            setPaddleInitError('');
+          }
+          return;
         }
-      },
-    })
-      .then((instance) => {
-        if (!cancelled && instance) {
-          setPaddle(instance);
+      } catch (sdkErr) {
+        console.warn('Primary Paddle CDN load failed, retrying direct script:', sdkErr);
+      }
+
+      try {
+        const fallbackInstance = await loadPaddleScriptDirect(token, environment, handleCompleted);
+        if (fallbackInstance && !cancelled) {
+          setPaddle(fallbackInstance);
+          setPaddleInitError('');
+          return;
         }
-      })
-      .catch((err) => {
-        console.error('Paddle initialization error:', err);
-        if (!cancelled) {
-          setPaddleInitError(
-            isArabic
-              ? 'تعذر تهيئة بوابة Paddle حالياً. تأكد من ضبط NEXT_PUBLIC_PADDLE_CLIENT_TOKEN.'
-              : 'Failed to initialize Paddle checkout. Check NEXT_PUBLIC_PADDLE_CLIENT_TOKEN.'
-          );
-        }
-      });
+      } catch (fallbackErr) {
+        console.error('Paddle initialization error:', fallbackErr);
+      }
+
+      if (!cancelled) {
+        setPaddleInitError(
+          isArabic
+            ? 'تعذر تحميل بوابة الدفع Paddle. تأكد من عدم وجود مانع إعلانات وتأكد من صحة NEXT_PUBLIC_PADDLE_CLIENT_TOKEN.'
+            : 'Unable to load Paddle checkout script. Disable any ad blocker and verify NEXT_PUBLIC_PADDLE_CLIENT_TOKEN.'
+        );
+      }
+    };
+
+    void bootPaddle();
 
     return () => {
       cancelled = true;
@@ -148,7 +244,7 @@ export function PricingPageClient({ locale }: { locale: string }) {
 
       let activePaddle = paddle;
       if (!activePaddle) {
-        const token = (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '').trim().replace(/^["']+|["']+$/g, '').trim();
+        const { token, environment } = resolvePaddleConfig();
         if (!token) {
           setErrorMsg(
             isArabic
@@ -157,12 +253,33 @@ export function PricingPageClient({ locale }: { locale: string }) {
           );
           return;
         }
-        activePaddle = (await initializePaddle({
-          environment: 'production',
-          token,
-        })) || null;
+        const handleCompleted = () => {
+          setSuccessMsg(
+            isArabic
+              ? 'تم إتمام الاشتراك بنجاح! سيتم تفعيل الباقة وتحديث حسابك خلال لحظات.'
+              : 'Subscription payment complete! Your plan and credits are activating now.'
+          );
+        };
+        try {
+          activePaddle =
+            (await initializePaddle({
+              environment,
+              token,
+              eventCallback(event) {
+                if (event.name === 'checkout.completed') {
+                  handleCompleted();
+                }
+              },
+            })) || null;
+        } catch {
+          activePaddle = null;
+        }
+        if (!activePaddle) {
+          activePaddle = await loadPaddleScriptDirect(token, environment, handleCompleted);
+        }
         if (activePaddle) {
           setPaddle(activePaddle);
+          setPaddleInitError('');
         }
       }
 
