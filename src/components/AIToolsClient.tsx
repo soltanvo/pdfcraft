@@ -4,10 +4,12 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
+  ArrowUpRight,
   Check,
   Coins,
   Copy,
   Download,
+  ExternalLink,
   FileText,
   Image as ImageIcon,
   Loader2,
@@ -40,6 +42,103 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface ActionLinkItem {
+  label: string;
+  href: string;
+}
+
+function isSafeInternalRoute(href: string): boolean {
+  return href.startsWith('/') && !href.startsWith('//') && !/\s/.test(href);
+}
+
+function isSafeExternalUrl(href: string): boolean {
+  return /^https?:\/\//i.test(href) || /^mailto:/i.test(href);
+}
+
+function extractInternalActionLinks(content: string): ActionLinkItem[] {
+  const seen = new Set<string>();
+  const results: ActionLinkItem[] = [];
+  const linkRegex = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(content)) !== null) {
+    const label = match[1].trim();
+    const href = match[2].trim();
+    if (label && isSafeInternalRoute(href) && !seen.has(href)) {
+      seen.add(href);
+      results.push({ label, href });
+    }
+  }
+  return results;
+}
+
+function renderInlineMarkdown(text: string, standaloneLink = false): React.ReactNode[] {
+  const tokenRegex = /(\[[^\]]+\]\([^)\s]+\)|\*\*[^*]+\*\*|`[^`]+`)/g;
+  const parts = text.split(tokenRegex);
+
+  return parts.map((part, idx) => {
+    if (!part) return null;
+
+    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+    if (linkMatch) {
+      const label = linkMatch[1].trim();
+      const href = linkMatch[2].trim();
+      if (isSafeInternalRoute(href)) {
+        return (
+          <Link
+            key={idx}
+            href={href}
+            className={
+              standaloneLink
+                ? 'inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-blue-600 text-white text-sm font-semibold shadow-xs transition-colors no-underline'
+                : 'inline-flex items-center gap-1 px-2.5 py-0.5 mx-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors align-baseline no-underline'
+            }
+          >
+            <span>{label}</span>
+            <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+          </Link>
+        );
+      }
+      if (isSafeExternalUrl(href)) {
+        return (
+          <a
+            key={idx}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 underline font-semibold"
+          >
+            <span>{label}</span>
+            <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+          </a>
+        );
+      }
+      return <span key={idx}>{label}</span>;
+    }
+
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return (
+        <strong key={idx} className="font-bold text-slate-900">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return (
+        <code
+          key={idx}
+          dir="ltr"
+          className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono"
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    return <span key={idx}>{part}</span>;
+  });
+}
+
 function SafeMarkdownView({ content }: { content: string }) {
   const blocks = content.split(/```[\s\S]*?```/g);
   const codeMatches = content.match(/```[\s\S]*?```/g) || [];
@@ -57,35 +156,55 @@ function SafeMarkdownView({ content }: { content: string }) {
               if (trimmed.startsWith('### ')) {
                 return (
                   <h4 key={lIdx} className="text-lg font-bold text-slate-900 pt-2">
-                    {trimmed.slice(4)}
+                    {renderInlineMarkdown(trimmed.slice(4))}
                   </h4>
                 );
               }
               if (trimmed.startsWith('## ')) {
                 return (
                   <h3 key={lIdx} className="text-xl font-bold text-slate-900 pt-2">
-                    {trimmed.slice(3)}
+                    {renderInlineMarkdown(trimmed.slice(3))}
                   </h3>
                 );
               }
               if (trimmed.startsWith('# ')) {
                 return (
                   <h2 key={lIdx} className="text-2xl font-extrabold text-slate-900 pt-2">
-                    {trimmed.slice(2)}
+                    {renderInlineMarkdown(trimmed.slice(2))}
                   </h2>
                 );
               }
               if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                const body = trimmed.slice(2);
+                const isOnlyLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(body.trim());
                 return (
                   <div key={lIdx} className="flex items-start gap-2.5 ps-2">
                     <span className="text-amber-600 font-bold mt-0.5">•</span>
-                    <span>{trimmed.slice(2).replace(/\*\*/g, '')}</span>
+                    <div className="flex-1">{renderInlineMarkdown(body, isOnlyLink)}</div>
+                  </div>
+                );
+              }
+              const orderedMatch = trimmed.match(/^(\d+\.)\s+(.*)$/);
+              if (orderedMatch) {
+                const isOnlyLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(orderedMatch[2].trim());
+                return (
+                  <div key={lIdx} className="flex items-start gap-2.5 ps-2">
+                    <span className="text-slate-700 font-bold tabular-nums">{orderedMatch[1]}</span>
+                    <div className="flex-1">{renderInlineMarkdown(orderedMatch[2], isOnlyLink)}</div>
+                  </div>
+                );
+              }
+              const isStandaloneLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(trimmed);
+              if (isStandaloneLink) {
+                return (
+                  <div key={lIdx} className="pt-1">
+                    {renderInlineMarkdown(trimmed, true)}
                   </div>
                 );
               }
               return (
                 <p key={lIdx} className="whitespace-pre-wrap">
-                  {trimmed.replace(/\*\*/g, '')}
+                  {renderInlineMarkdown(trimmed)}
                 </p>
               );
             })}
@@ -129,15 +248,15 @@ export function AIToolsClient({ locale }: { locale: string }) {
   const quickPrompts = isArabic
     ? [
         'لخّص هذا المستند في نقاط رئيسية واضحة',
+        'أنشئ اختباراً (أسئلة اختيار من متعدد مع الإجابات) من المحتوى',
+        'كيف أدمج أو أضغط ملفات PDF في المنصة؟',
         'استخرج البيانات والأسماء والأرقام المهمة من الملف',
-        'ترجم المحتوى إلى اللغة العربية الفصحى بدقة',
-        'اقترح تحسينات لغوية واحترافية على النص',
       ]
     : [
         'Summarize this document into clear key points',
-        'Extract key entities, dates, and figures',
-        'Translate this content cleanly into English',
-        'Improve tone and rewrite professionally',
+        'Create an exam / quiz with multiple-choice questions and answers',
+        'How do I merge or compress PDF files on SA AI?',
+        'Extract key entities, dates, and figures from this file',
       ];
 
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,6 +365,12 @@ export function AIToolsClient({ locale }: { locale: string }) {
     setAttached(null);
     setIsLoading(true);
 
+    const assistantId = `a_${Date.now()}`;
+    const assistantTimestamp = new Date().toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
@@ -260,22 +385,119 @@ export function AIToolsClient({ locale }: { locale: string }) {
         }),
       });
 
-      const data = (await res.json()) as { reply?: string; error?: string };
-      if (!res.ok || !data.reply) {
-        throw new Error(data.error || 'AI request failed');
+      if (!res.ok) {
+        let errMsg = `AI service error (${res.status})`;
+        try {
+          const errData = (await res.json()) as { error?: string };
+          if (errData?.error) errMsg = errData.error;
+        } catch {
+          // Ignore parse error
+        }
+        throw new Error(errMsg);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      let fullReply = '';
+      let streamError: string | null = null;
+
+      if (contentType.includes('text/event-stream') && res.body) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: '',
+            timestamp: assistantTimestamp,
+          },
+        ]);
+        setActiveResultId(assistantId);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let sseBuffer = '';
+
+        const applyChunkText = (chunkText: string) => {
+          fullReply += chunkText;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: fullReply } : m))
+          );
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+
+          const lines = sseBuffer.split('\n');
+          sseBuffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const jsonStr = trimmed.slice(5).trim();
+            if (!jsonStr || jsonStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(jsonStr) as {
+                text?: string;
+                error?: string;
+                done?: boolean;
+              };
+              if (parsed.error) {
+                streamError = parsed.error;
+              } else if (parsed.text) {
+                applyChunkText(parsed.text);
+              }
+            } catch {
+              // Ignore partial SSE JSON
+            }
+          }
+        }
+
+        const trailing = sseBuffer.trim();
+        if (trailing.startsWith('data:')) {
+          try {
+            const parsed = JSON.parse(trailing.slice(5).trim()) as {
+              text?: string;
+              error?: string;
+            };
+            if (parsed.error) streamError = parsed.error;
+            else if (parsed.text) applyChunkText(parsed.text);
+          } catch {
+            // Ignore trailing parse error
+          }
+        }
+
+        if (streamError && !fullReply.trim()) {
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          throw new Error(streamError);
+        }
+
+        if (!fullReply.trim()) {
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+          throw new Error('Empty response from AI model.');
+        }
+      } else {
+        const data = (await res.json()) as { reply?: string; error?: string };
+        if (!data.reply) {
+          throw new Error(data.error || 'AI request failed');
+        }
+        fullReply = data.reply;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: fullReply,
+            timestamp: assistantTimestamp,
+          },
+        ]);
+        setActiveResultId(assistantId);
       }
 
       await deductCredit();
-
-      const assistantMsg: ChatMessage = {
-        id: `a_${Date.now()}`,
-        role: 'assistant',
-        content: data.reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      setActiveResultId(assistantMsg.id);
+      if (streamError) {
+        setError(streamError);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate AI response.');
     } finally {
@@ -436,8 +658,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-slate-600">
                   {isArabic
-                    ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اكتب طلبك لتحليله فوراً بنموذج Gemini 2.0 Flash (نقطة واحدة لكل رسالة).'
-                    : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or type your prompt to analyze with Gemini 2.0 Flash (1 credit per response).'}
+                    ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اسأل عن أي أداة PDF وسيوجهك المساعد مباشرة إليها بسرعة فائقة بنموذج Gemini 2.5 Flash (نقطة واحدة لكل رسالة).'
+                    : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or ask how to use any SA AI tool for instant guidance powered by Gemini 2.5 Flash (1 credit per response).'}
                 </p>
               </div>
 
@@ -484,7 +706,34 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     <span className="truncate">{m.attachmentName}</span>
                   </div>
                 )}
-                <p className="whitespace-pre-wrap line-clamp-6">{m.content}</p>
+                <p className="whitespace-pre-wrap line-clamp-6">
+                  {m.content
+                    ? m.content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\*\*/g, '')
+                    : isArabic
+                    ? 'جارٍ الكتابة...'
+                    : 'Streaming...'}
+                </p>
+                {m.role === 'assistant' && (() => {
+                  const actionLinks = extractInternalActionLinks(m.content);
+                  if (actionLinks.length === 0) return null;
+                  return (
+                    <div
+                      className="mt-2.5 flex flex-wrap gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {actionLinks.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                        >
+                          <span>{item.label}</span>
+                          <ArrowUpRight className="w-3 h-3 shrink-0" />
+                        </Link>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             ))
           )}
@@ -492,7 +741,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
           {isLoading && (
             <div className="flex items-center gap-2.5 p-3.5 rounded-xl border border-blue-200 bg-blue-50/60 text-blue-800 text-base font-medium">
               <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-              <span>{isArabic ? 'SA AI يقوم بتحليل طلبك الآن...' : 'SA AI is analyzing...'}</span>
+              <span>{isArabic ? 'SA AI يكتب الإجابة مباشرة...' : 'SA AI is streaming response...'}</span>
             </div>
           )}
 
@@ -710,7 +959,14 @@ export function AIToolsClient({ locale }: { locale: string }) {
               </div>
 
               <div className="p-6 sm:p-8">
-                <SafeMarkdownView content={activeResult.content} />
+                {activeResult.content ? (
+                  <SafeMarkdownView content={activeResult.content} />
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span>{isArabic ? 'جارٍ استقبال الرد...' : 'Receiving streamed response...'}</span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -726,8 +982,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </h2>
                 <p className="text-sm text-slate-600 leading-relaxed">
                   {isArabic
-                    ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل الكاملة من Gemini 2.0 Flash مع إمكانية النسخ أو التصدير المباشر.'
-                    : 'Attached images, PDF previews, and full structured results from Gemini 2.0 Flash appear here ready to copy or export.'}
+                    ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل والاختبارات وروابط الأدوات الفورية من Gemini 2.5 Flash مع إمكانية النسخ أو التصدير المباشر.'
+                    : 'Attached images, PDF previews, structured analysis, exams, and direct tool action links from Gemini 2.5 Flash stream here live ready to copy or export.'}
                 </p>
               </div>
             </div>
