@@ -101,8 +101,10 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
           || (
             incoming().diff(existing()).affectedKeys().hasOnly(['credits', 'updatedAt'])
-            && existing().credits >= 1
-            && incoming().credits == existing().credits - 1
+            && (
+              (existing().credits >= 1 && incoming().credits == existing().credits - 1)
+              || (existing().credits >= 2 && incoming().credits == existing().credits - 2)
+            )
           )
         );
       allow delete: if false;

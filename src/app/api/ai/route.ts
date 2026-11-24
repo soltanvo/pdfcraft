@@ -12,8 +12,8 @@ interface ChatHistoryItem {
 
 const MAX_DOC_CHARS = 45000;
 const ALLOWED_IMAGE_REGEX = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i;
-const PRIMARY_GEMINI_MODEL = 'gemini-3.8-flash';
-const FALLBACK_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const PRIMARY_GEMINI_MODEL = 'gemini-2.5-flash';
+const FALLBACK_GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 const PLATFORM_TOOLS_CATALOG = TOOLS.map(
   (t) => `- ${t.name} | slug: ${t.slug} | category: ${t.category} | ${t.description}`
@@ -88,13 +88,31 @@ function buildSystemInstruction(locale: string): string {
   const activeLocale = isValidLocale(locale) ? locale : 'en';
   const languageGuidance =
     activeLocale === 'ar'
-      ? 'Respond clearly in Arabic unless the user explicitly asks for another language. Use structured Markdown headings and bullet points when helpful.'
-      : 'Respond clearly and concisely in the user’s language using structured Markdown headings and bullet points when helpful.';
+      ? 'Respond clearly in Arabic unless the user explicitly asks for another language. Always format every response cleanly using Markdown headings (##, ###), numbered lists, bullet points, and clear spacing between sections.'
+      : 'Respond clearly and concisely in the user’s language. Always format every response cleanly using Markdown headings (##, ###), numbered lists, bullet points, and clear spacing between sections.';
 
   return [
     `You are SA AI, an ultra-fast AI document analyst and smart platform navigator for the SA AI web application.`,
     languageGuidance,
     `The user's active locale prefix is "/${activeLocale}".`,
+    ``,
+    `### Clean Markdown & Exam Formatting Rules`,
+    `- Start structured documents, summaries, or exams with a clear ## title header.`,
+    `- Separate distinct sections with ### headings and blank lines so nothing runs together in a dense wall of text.`,
+    `- Put each numbered item, question, and answer choice on its own separate line.`,
+    `- When the user asks to generate an exam, test, or quiz (from an attached PDF/text or topic):`,
+    activeLocale === 'ar'
+      ? `  1. ابدأ بعنوان واضح للاختبار باستخدام (##).`
+      : `  1. Start with a clear exam title using (##).`,
+    activeLocale === 'ar'
+      ? `  2. قسّم الاختبار إلى أقسام مرقّمة منفصلة مثل: "### أولاً: أسئلة الاختيار من متعدد" و "### ثانياً: أسئلة الأكمل" (وغيرها حسب الحاجة).`
+      : `  2. Group questions into clearly numbered sections such as "### Part 1: Multiple-Choice Questions" and "### Part 2: Fill-in-the-Blank Questions".`,
+    activeLocale === 'ar'
+      ? `  3. ضع كل سؤال في سطر مستقل، وضع كل خيار (أ، ب، ج، د) في سطر مستقل أو منظم بوضوح.`
+      : `  3. Put each question on its own line, and each option (A, B, C, D) cleanly on its own line.`,
+    activeLocale === 'ar'
+      ? `  4. أضف في نهاية الاختبار قسماً مستقلاً بعنوان: "### نموذج الإجابة الصحيحة" يحتوي على رقم كل سؤال وإجابته الصحيحة.`
+      : `  4. Always place a separate "### Answer Key" section at the very bottom listing every question number and its correct answer.`,
     ``,
     `### Platform Navigation & Action Links Rules`,
     `When a user asks how to perform a PDF, document, conversion, security, or workflow task:`,
@@ -134,11 +152,13 @@ async function startStreamWithFallback(
   systemInstruction: string
 ) {
   const openForModel = async (modelName: string) => {
+    const useZeroThinkingBudget = modelName.startsWith('gemini-2.5-flash');
     const stream = await ai.models.generateContentStream({
       model: modelName,
       contents,
       config: {
         systemInstruction,
+        ...(useZeroThinkingBudget ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     });
     const iterator = stream[Symbol.asyncIterator]();

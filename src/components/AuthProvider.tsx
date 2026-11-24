@@ -62,7 +62,7 @@ interface AuthContextValue {
   clearError: () => void;
   signInWithGoogle: () => Promise<User | null>;
   logout: () => Promise<void>;
-  deductCredit: () => Promise<void>;
+  deductCredit: (amount?: 1 | 2) => Promise<void>;
   addPaidCredits: (planId: 'starter' | 'pro', orderId: string) => Promise<void>;
 }
 
@@ -245,25 +245,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const deductCredit = useCallback(async () => {
+  const deductCredit = useCallback(async (amount: 1 | 2 = 1) => {
     if (!auth || !db) {
-      return;
+      throw new Error('Firebase is not configured');
     }
     const activeUser = auth.currentUser;
     if (!activeUser) {
-      return;
+      throw new Error('Authentication required');
     }
+    const safeAmount: 1 | 2 = amount === 2 ? 2 : 1;
     const userPath = `users/${activeUser.uid}`;
     const userRef = doc(db, 'users', activeUser.uid);
+
+    // Update UI balance immediately for responsive header feedback
+    setProfile((prev) =>
+      prev ? { ...prev, credits: Math.max(0, prev.credits - safeAmount) } : prev
+    );
+
     try {
       await updateDoc(userRef, {
-        credits: increment(-1),
+        credits: increment(-safeAmount),
         updatedAt: serverTimestamp(),
       });
       setFirestoreOffline(false);
     } catch (err) {
       if (isFirestoreOfflineError(err)) {
-        console.warn('Firestore offline during credit deduction; skipping deduction.');
+        console.warn('Firestore offline during credit deduction:', err);
         setFirestoreOffline(true);
         return;
       }

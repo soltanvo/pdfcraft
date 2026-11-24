@@ -157,21 +157,27 @@ function SafeMarkdownView({ content }: { content: string }) {
               if (!trimmed) return null;
               if (trimmed.startsWith('### ')) {
                 return (
-                  <h4 key={lIdx} className="text-lg font-bold text-slate-900 pt-2">
+                  <h4
+                    key={lIdx}
+                    className="text-lg font-bold text-slate-900 mt-4 pt-3 border-t border-slate-100 first:mt-0 first:pt-0 first:border-t-0"
+                  >
                     {renderInlineMarkdown(trimmed.slice(4))}
                   </h4>
                 );
               }
               if (trimmed.startsWith('## ')) {
                 return (
-                  <h3 key={lIdx} className="text-xl font-bold text-slate-900 pt-2">
+                  <h3
+                    key={lIdx}
+                    className="text-xl font-extrabold text-slate-900 mt-4 pt-3 border-t border-slate-200 first:mt-0 first:pt-0 first:border-t-0"
+                  >
                     {renderInlineMarkdown(trimmed.slice(3))}
                   </h3>
                 );
               }
               if (trimmed.startsWith('# ')) {
                 return (
-                  <h2 key={lIdx} className="text-2xl font-extrabold text-slate-900 pt-2">
+                  <h2 key={lIdx} className="text-2xl font-extrabold text-slate-900 pt-1">
                     {renderInlineMarkdown(trimmed.slice(2))}
                   </h2>
                 );
@@ -180,19 +186,30 @@ function SafeMarkdownView({ content }: { content: string }) {
                 const body = trimmed.slice(2);
                 const isOnlyLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(body.trim());
                 return (
-                  <div key={lIdx} className="flex items-start gap-2.5 ps-2">
+                  <div key={lIdx} className="flex items-start gap-2.5 ps-3">
                     <span className="text-amber-600 font-bold mt-0.5">•</span>
                     <div className="flex-1">{renderInlineMarkdown(body, isOnlyLink)}</div>
                   </div>
                 );
               }
-              const orderedMatch = trimmed.match(/^(\d+\.)\s+(.*)$/);
+              const orderedMatch = trimmed.match(/^(\d+[.)])\s+(.*)$/);
               if (orderedMatch) {
                 const isOnlyLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(orderedMatch[2].trim());
                 return (
-                  <div key={lIdx} className="flex items-start gap-2.5 ps-2">
-                    <span className="text-slate-700 font-bold tabular-nums">{orderedMatch[1]}</span>
+                  <div key={lIdx} className="flex items-start gap-2.5 ps-2 pt-1">
+                    <span className="text-slate-900 font-bold tabular-nums shrink-0">
+                      {orderedMatch[1]}
+                    </span>
                     <div className="flex-1">{renderInlineMarkdown(orderedMatch[2], isOnlyLink)}</div>
+                  </div>
+                );
+              }
+              const optionMatch = trimmed.match(/^([أبجدهـA-Da-d][.)]|[(][أبجدهـA-Da-d][)])\s+(.*)$/);
+              if (optionMatch) {
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 ps-6 text-slate-700">
+                    <span className="font-bold text-slate-800 shrink-0">{optionMatch[1]}</span>
+                    <div className="flex-1">{renderInlineMarkdown(optionMatch[2])}</div>
                   </div>
                 );
               }
@@ -241,6 +258,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
   const [copied, setCopied] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const requiredCredits: 1 | 2 = attached ? 2 : 1;
+  const hasInsufficientCredits = Boolean(user && profile && credits < requiredCredits);
 
   const assistantResults = messages.filter((m) => m.role === 'assistant');
   const activeResult =
@@ -340,39 +359,51 @@ export function AIToolsClient({ locale }: { locale: string }) {
     if (!promptText && !attached) return;
 
     if (!user) {
+      setError(
+        isArabic
+          ? 'يرجى تسجيل الدخول بحساب Google أولاً لاستخدام المساعد الذكي.'
+          : 'Please sign in with Google first to use SA AI Studio.'
+      );
       await signInWithGoogle();
       return;
     }
 
-    // Never block /api/ai if Firestore is offline or throws "client is offline"
-    let confirmedZeroCredits = false;
-    try {
-      if (profile && !firestoreOffline) {
-        confirmedZeroCredits = credits < 1;
-      } else if (db && !firestoreOffline) {
-        const snap = await Promise.race([
-          getDoc(doc(db, 'users', user.uid)),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
-        ]);
-        if (snap && snap.exists()) {
+    const requestCost: 1 | 2 = attached ? 2 : 1;
+
+    // Strictly verify live Firestore credit balance before sending (no free bypass)
+    let availableCredits: number | null = profile ? profile.credits : null;
+    if (availableCredits === null && db) {
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        if (snap.exists()) {
           const remoteCredits = snap.data()?.credits;
-          if (typeof remoteCredits === 'number' && remoteCredits < 1) {
-            confirmedZeroCredits = true;
+          if (typeof remoteCredits === 'number') {
+            availableCredits = remoteCredits;
           }
         }
+      } catch (firestoreErr) {
+        console.warn('Firestore credit verification failed:', firestoreErr);
       }
-    } catch (firestoreErr) {
-      console.warn(
-        'Firestore credit check unavailable (proceeding with /api/ai):',
-        firestoreErr
-      );
     }
 
-    if (confirmedZeroCredits) {
+    if (availableCredits === null) {
       setError(
         isArabic
-          ? 'نفد رصيد النقاط لديك. يرجى شحن رصيدك من صفحة الباقات للمتابعة.'
-          : 'You have 0 credits remaining. Please top up in Pricing to continue.'
+          ? 'تعذر التحقق من رصيد النقاط حالياً من الخادم. يرجى التحقق من الاتصال وإعادة المحاولة.'
+          : 'Could not verify your credit balance right now. Please check your connection and try again.'
+      );
+      return;
+    }
+
+    if (availableCredits < requestCost) {
+      setError(
+        isArabic
+          ? availableCredits === 1 && requestCost === 2
+            ? 'تحليل ملف PDF أو مرفق يتطلب نقطتين (2)، ورصيدك الحالي نقطة واحدة (1) فقط.'
+            : 'انتهت نقاطك - اشحن رصيدك الآن للمتابعة.'
+          : availableCredits === 1 && requestCost === 2
+          ? 'Analyzing a PDF or attached file costs 2 credits, and you currently have 1 credit left.'
+          : 'Out of credits — top up your balance now to continue.'
       );
       return;
     }
@@ -558,8 +589,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
     }
 
     if (aiSucceeded) {
-      void deductCredit().catch((deductErr) => {
-        console.warn('Firestore credit deduction failed (AI response kept):', deductErr);
+      void deductCredit(requestCost).catch((deductErr) => {
+        console.warn('Firestore credit deduction failed:', deductErr);
       });
     }
   };
@@ -717,8 +748,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-slate-600">
                   {isArabic
-                    ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اسأل عن أي أداة PDF وسيوجهك المساعد مباشرة إليها بسرعة فائقة بنموذج Gemini 3.8 Flash (نقطة واحدة لكل رسالة).'
-                    : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or ask how to use any SA AI tool for instant guidance powered by Gemini 3.8 Flash (1 credit per response).'}
+                    ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اسأل عن أي أداة PDF وسيوجهك المساعد مباشرة إليها بسرعة فائقة بنموذج Gemini 2.5 Flash (1 نقطة للرسالة / 2 نقطة لتحليل PDF).'
+                    : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or ask how to use any SA AI tool for instant guidance powered by Gemini 2.5 Flash (1 credit/msg, 2 credits/PDF).'}
                 </p>
               </div>
 
@@ -805,16 +836,21 @@ export function AIToolsClient({ locale }: { locale: string }) {
           )}
 
           {error && (
-            <div className="flex items-start gap-2 p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 text-xs">
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-900 text-xs sm:text-sm">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p>{error}</p>
-                {credits < 1 && user && !firestoreOffline && (
+              <div className="space-y-2 flex-1">
+                <p className="font-medium leading-relaxed">{error}</p>
+                {hasInsufficientCredits && (
                   <Link
                     href={`/${locale}/pricing`}
-                    className="inline-block font-bold text-rose-900 underline"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors"
                   >
-                    {isArabic ? 'انتقل إلى الباقات لشحن النقاط' : 'Go to Pricing to top up'}
+                    <Coins className="w-3.5 h-3.5" />
+                    <span>
+                      {isArabic
+                        ? 'انتهت نقاطك - اشحن رصيدك الآن'
+                        : 'Top up your credits now'}
+                    </span>
                   </Link>
                 )}
               </div>
@@ -822,8 +858,51 @@ export function AIToolsClient({ locale }: { locale: string }) {
           )}
         </div>
 
-        {/* Composer with Animated Conic-Gradient Glowing Border on Loading */}
-        <div className="p-3 border-t border-slate-200 bg-white">
+        {/* Composer with Clear Cost Display & Animated Glow Border */}
+        <div className="p-3 border-t border-slate-200 bg-white space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] sm:text-xs font-semibold text-slate-600">
+            <div className="flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>
+                {isArabic
+                  ? 'التكلفة: 1 نقطة للرسالة | 2 نقطة لتحليل PDF'
+                  : 'Cost: 1 credit/msg | 2 credits/PDF'}
+              </span>
+            </div>
+            <span
+              className={`px-2 py-0.5 rounded-md tabular-nums ${
+                attached
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-white text-slate-700 border border-slate-200'
+              }`}
+            >
+              {isArabic
+                ? `الطلب الحالي: ${requiredCredits} ${requiredCredits === 2 ? 'نقطة' : 'نقطة'}`
+                : `This send: ${requiredCredits} ${requiredCredits === 2 ? 'credits' : 'credit'}`}
+            </span>
+          </div>
+
+          {hasInsufficientCredits && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 text-xs">
+              <span className="font-semibold">
+                {isArabic
+                  ? credits === 1 && requiredCredits === 2
+                    ? 'تحليل PDF يتطلب نقطتين (رصيدك: 1)'
+                    : 'انتهت نقاطك - اشحن رصيدك الآن'
+                  : credits === 1 && requiredCredits === 2
+                  ? 'PDF analysis requires 2 credits (Balance: 1)'
+                  : 'Insufficient credits — top up to continue'}
+              </span>
+              <Link
+                href={`/${locale}/pricing`}
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors"
+              >
+                <span>{isArabic ? 'اشحن الآن' : 'Top up'}</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
+
           <div
             className={
               isLoading
@@ -1046,8 +1125,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </h2>
                 <p className="text-sm text-slate-600 leading-relaxed">
                   {isArabic
-                    ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل والاختبارات وروابط الأدوات الفورية من Gemini 3.8 Flash مع إمكانية النسخ أو التصدير المباشر.'
-                    : 'Attached images, PDF previews, structured analysis, exams, and direct tool action links from Gemini 3.8 Flash stream here live ready to copy or export.'}
+                    ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل والاختبارات وروابط الأدوات الفورية من Gemini 2.5 Flash مع إمكانية النسخ أو التصدير المباشر.'
+                    : 'Attached images, PDF previews, structured analysis, exams, and direct tool action links from Gemini 2.5 Flash stream here live ready to copy or export.'}
                 </p>
               </div>
             </div>
