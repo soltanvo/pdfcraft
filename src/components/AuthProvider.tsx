@@ -43,6 +43,10 @@ export interface UserProfile {
   photoURL: string;
   credits: number;
   isPaid: boolean;
+  plan?: 'free' | 'starter' | 'pro';
+  subscriptionStatus?: 'active' | 'canceled' | 'past_due' | 'paused';
+  paddleCustomerId?: string;
+  paddleSubscriptionId?: string;
   lastOrderId?: string;
 }
 
@@ -117,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             photoURL: (firebaseUser.photoURL || '').slice(0, 1000),
             credits: 5,
             isPaid: false,
-            lastOrderId: '',
+            plan: 'free',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           };
@@ -137,13 +141,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.data();
+            const plan =
+              data.plan === 'starter' || data.plan === 'pro' || data.plan === 'free'
+                ? data.plan
+                : 'free';
+            const subscriptionStatus =
+              data.subscriptionStatus === 'active' ||
+              data.subscriptionStatus === 'canceled' ||
+              data.subscriptionStatus === 'past_due' ||
+              data.subscriptionStatus === 'paused'
+                ? data.subscriptionStatus
+                : undefined;
             setProfile({
               uid: String(data.uid || firebaseUser.uid),
               email: String(data.email || firebaseUser.email || ''),
               displayName: String(data.displayName || firebaseUser.displayName || 'SA AI User'),
               photoURL: String(data.photoURL || firebaseUser.photoURL || ''),
               credits: typeof data.credits === 'number' ? data.credits : 0,
-              isPaid: Boolean(data.isPaid),
+              isPaid: Boolean(
+                data.isPaid ||
+                  subscriptionStatus === 'active' ||
+                  plan === 'starter' ||
+                  plan === 'pro'
+              ),
+              plan,
+              subscriptionStatus,
+              paddleCustomerId:
+                typeof data.paddleCustomerId === 'string' ? data.paddleCustomerId : undefined,
+              paddleSubscriptionId:
+                typeof data.paddleSubscriptionId === 'string'
+                  ? data.paddleSubscriptionId
+                  : undefined,
               lastOrderId: typeof data.lastOrderId === 'string' ? data.lastOrderId : undefined,
             });
           }

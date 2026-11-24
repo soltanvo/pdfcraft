@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import {
@@ -18,6 +19,7 @@ import {
 import { ToolCard } from '@/components/ToolCard';
 import { ToolIcon } from '@/components/ToolIcon';
 import { HomeSearchBar } from '@/components/HomeSearchBar';
+import { PaymentSuccessBanner } from '@/components/PaymentSuccessBanner';
 import { locales } from '@/lib/i18n/config';
 
 const CATEGORIES: ToolCategory[] = [
@@ -43,6 +45,9 @@ export default async function HomePage({
 
   return (
     <div className="space-y-16 pb-16">
+      <Suspense fallback={null}>
+        <PaymentSuccessBanner locale={locale} />
+      </Suspense>
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-slate-200/80 dark:border-slate-800/80 bg-gradient-to-b from-blue-50/70 via-white to-slate-50 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center space-y-6">

@@ -1,37 +1,17 @@
 import type { Metadata } from 'next';
-import { setRequestLocale, getTranslations } from 'next-intl/server';
-import { locales, type Locale } from '@/lib/i18n/config';
-import { generatePrivacyMetadata } from '@/lib/seo';
-import TermsPageClient from './TermsPageClient';
+import { setRequestLocale } from 'next-intl/server';
+import { LegalDocumentPage } from '@/components/LegalDocumentPage';
 
-export function generateStaticParams() {
-  return locales.map((locale) => ({ locale }));
-}
+export const metadata: Metadata = {
+  title: 'Terms of Service | SA AI',
+};
 
-export async function generateMetadata({
+export default async function LocaleTermsPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
+}) {
   const { locale } = await params;
-  const validLocale = (locales.includes(locale as any) ? locale : 'ar') as any;
-  const t = await getTranslations({ locale: validLocale, namespace: 'metadata' });
-
-  return generatePrivacyMetadata(validLocale, {
-    title: t('privacy.title'),
-    description: t('privacy.description'),
-  });
-}
-
-interface PrivacyPageProps {
-  params: Promise<{ locale: string }>;
-}
-
-export default async function PrivacyPage({ params }: PrivacyPageProps) {
-  const { locale } = await params;
-
-  // Enable static rendering
   setRequestLocale(locale);
-
-  return <TermsPageClient locale={locale as Locale} />;
+  return <LegalDocumentPage kind="terms" locale={locale} />;
 }

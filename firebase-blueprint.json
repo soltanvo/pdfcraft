@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "SA AI authenticated user profile, credit balance, and subscription status",
+      "description": "SA AI authenticated user profile, credit balance, and Paddle subscription status",
       "type": "object",
       "properties": {
         "uid": {
@@ -34,11 +34,31 @@
         },
         "isPaid": {
           "type": "boolean",
-          "description": "Whether user has purchased a paid plan (removes SA AI watermark)"
+          "description": "Whether user has an active paid plan (removes SA AI watermark)"
+        },
+        "plan": {
+          "type": "string",
+          "enum": ["free", "starter", "pro"],
+          "description": "Active subscription tier managed via Paddle webhook"
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "enum": ["active", "canceled", "past_due", "paused"],
+          "description": "Paddle subscription lifecycle status"
+        },
+        "paddleCustomerId": {
+          "type": "string",
+          "description": "Paddle customer ID",
+          "maxLength": 128
+        },
+        "paddleSubscriptionId": {
+          "type": "string",
+          "description": "Paddle subscription or transaction reference ID",
+          "maxLength": 128
         },
         "lastOrderId": {
           "type": "string",
-          "description": "Most recent PayPal order ID applied to this account",
+          "description": "Most recent payment transaction ID applied to this account",
           "maxLength": 128
         },
         "createdAt": {
@@ -65,7 +85,7 @@
     },
     "CreditTransaction": {
       "title": "CreditTransaction",
-      "description": "Immutable record of PayPal credit purchases for a user",
+      "description": "Immutable record of subscription and credit purchases for a user",
       "type": "object",
       "properties": {
         "userId": {
@@ -77,7 +97,7 @@
         },
         "orderId": {
           "type": "string",
-          "description": "PayPal order ID",
+          "description": "Paddle transaction ID",
           "minLength": 3,
           "maxLength": 128
         },
@@ -97,7 +117,7 @@
         "status": {
           "type": "string",
           "enum": ["COMPLETED"],
-          "description": "PayPal capture status"
+          "description": "Payment completion status"
         },
         "createdAt": {
           "type": "string",
@@ -121,13 +141,13 @@
       "schema": {
         "$ref": "#/entities/UserProfile"
       },
-      "description": "Stores per-user credit balance and paid status"
+      "description": "Stores per-user credit balance and Paddle subscription state"
     },
     "/users/{userId}/transactions/{transactionId}": {
       "schema": {
         "$ref": "#/entities/CreditTransaction"
       },
-      "description": "Stores verified PayPal purchase history for the owning user"
+      "description": "Stores verified subscription transaction history for the owning user"
     }
   }
 }

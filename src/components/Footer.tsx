@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ShieldCheck } from 'lucide-react';
+import { Mail, ShieldCheck } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 
 export function Footer({ locale }: { locale: string }) {
@@ -20,6 +20,18 @@ export function Footer({ locale }: { locale: string }) {
             <div className="flex items-center gap-2 text-emerald-700 text-xs font-medium">
               <ShieldCheck className="w-4 h-4 shrink-0" />
               <span>{t('footer.privacyBadge')}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+              <span dir="ltr">
+                Support:{' '}
+                <a
+                  href="mailto:ssyyss368@gmail.com"
+                  className="font-semibold text-slate-900 hover:text-blue-600 transition-colors"
+                >
+                  ssyyss368@gmail.com
+                </a>
+              </span>
             </div>
           </div>
 
@@ -45,8 +57,14 @@ export function Footer({ locale }: { locale: string }) {
             <Link href={`/${locale}/faq`} className="hover:text-blue-600 transition-colors">
               {t('navigation.faq')}
             </Link>
-            <Link href={`/${locale}/privacy`} className="hover:text-blue-600 transition-colors">
-              {t('navigation.privacy')}
+            <Link href="/terms" className="hover:text-blue-600 transition-colors">
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="hover:text-blue-600 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/refunds" className="hover:text-blue-600 transition-colors">
+              Refund Policy
             </Link>
           </div>
         </div>
