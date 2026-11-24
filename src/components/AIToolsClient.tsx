@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
+  ArrowUp,
   ArrowUpRight,
   Check,
   Coins,
@@ -13,8 +14,8 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
+  Mic,
   Plus,
-  Send,
   Sparkles,
   Trash2,
   X,
@@ -24,6 +25,53 @@ import { useAuth } from '@/components/AuthProvider';
 import { db } from '@/lib/firebase/config';
 import { extractPdfTextByPage, renderPdfPageToCanvas } from '@/lib/pdf/pdfjs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternativeLike;
+}
+
+interface SpeechRecognitionResultListLike {
+  length: number;
+  [index: number]: SpeechRecognitionResultLike;
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultListLike;
+}
+
+interface SpeechRecognitionErrorEventLike extends Event {
+  error: string;
+  message?: string;
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onstart: ((this: SpeechRecognitionInstance, ev: Event) => void) | null;
+  onresult: ((this: SpeechRecognitionInstance, ev: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((this: SpeechRecognitionInstance, ev: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: ((this: SpeechRecognitionInstance, ev: Event) => void) | null;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+type SpeechWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+};
 
 interface AttachedFile {
   name: string;
@@ -256,10 +304,135 @@ export function AIToolsClient({ locale }: { locale: string }) {
   const [error, setError] = useState<string | null>(null);
   const [activeResultId, setActiveResultId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechLang, setSpeechLang] = useState<'ar-SA' | 'en-US'>(isArabic ? 'ar-SA' : 'en-US');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const voiceBaseInputRef = useRef('');
   const requiredCredits: 1 | 2 = attached ? 2 : 1;
   const hasInsufficientCredits = Boolean(user && profile && credits < requiredCredits);
+  const canSend = Boolean((input.trim() || attached) && !isLoading && !extractingFile);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 152)}px`;
+  }, [input]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        // Ignore cleanup errors
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  const stopVoiceCapture = () => {
+    const rec = recognitionRef.current;
+    if (rec) {
+      try {
+        rec.stop();
+      } catch {
+        // Ignore stop error
+      }
+    }
+    setIsListening(false);
+  };
+
+  const handleToggleVoice = () => {
+    if (isLoading) return;
+
+    if (isListening) {
+      stopVoiceCapture();
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    const win = window as SpeechWindow;
+    const SpeechRecognitionCtor = win.SpeechRecognition || win.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setError(
+        isArabic
+          ? 'الإدخال الصوتي غير مدعوم في هذا المتصفح. يرجى استخدام Chrome أو Edge أو Safari الحديث.'
+          : 'Voice input is not supported in this browser. Try Chrome, Edge, or modern Safari.'
+      );
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionCtor();
+      recognition.lang = speechLang;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      voiceBaseInputRef.current = input.trimEnd();
+
+      recognition.onstart = () => {
+        setError(null);
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEventLike) => {
+        const segments: string[] = [];
+        for (let i = 0; i < event.results.length; i++) {
+          const piece = event.results[i]?.[0]?.transcript?.trim();
+          if (piece) segments.push(piece);
+        }
+        const spoken = segments.join(' ').trim();
+        const base = voiceBaseInputRef.current;
+        const nextValue = base && spoken ? `${base} ${spoken}` : base || spoken;
+        setInput(nextValue);
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setError(
+            isArabic
+              ? 'تم رفض إذن الميكروفون. يرجى تفعيل الميكروفون من إعدادات المتصفح.'
+              : 'Microphone permission denied. Please allow microphone access in your browser settings.'
+          );
+        } else if (event.error === 'audio-capture') {
+          setError(
+            isArabic
+              ? 'لم يتم العثور على ميكروفون متصل بجهازك.'
+              : 'No microphone device was detected.'
+          );
+        } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          setError(
+            isArabic
+              ? 'تعذر إكمال الإدخال الصوتي. يرجى المحاولة مرة أخرى.'
+              : 'Voice recognition could not complete. Please try again.'
+          );
+        }
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      recognitionRef.current = null;
+      setError(
+        isArabic
+          ? 'تعذر تشغيل الميكروفون في هذا المتصفح.'
+          : 'Could not start microphone voice capture.'
+      );
+    }
+  };
 
   const assistantResults = messages.filter((m) => m.role === 'assistant');
   const activeResult =
@@ -355,6 +528,9 @@ export function AIToolsClient({ locale }: { locale: string }) {
 
   const handleSend = async (customPrompt?: string) => {
     if (isLoading) return;
+    if (isListening) {
+      stopVoiceCapture();
+    }
     const promptText = (customPrompt ?? input).trim();
     if (!promptText && !attached) return;
 
@@ -858,30 +1034,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
           )}
         </div>
 
-        {/* Composer with Clear Cost Display & Animated Glow Border */}
-        <div className="p-3 border-t border-slate-200 bg-white space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] sm:text-xs font-semibold text-slate-600">
-            <div className="flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span>
-                {isArabic
-                  ? 'التكلفة: 1 نقطة للرسالة | 2 نقطة لتحليل PDF'
-                  : 'Cost: 1 credit/msg | 2 credits/PDF'}
-              </span>
-            </div>
-            <span
-              className={`px-2 py-0.5 rounded-md tabular-nums ${
-                attached
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-white text-slate-700 border border-slate-200'
-              }`}
-            >
-              {isArabic
-                ? `الطلب الحالي: ${requiredCredits} ${requiredCredits === 2 ? 'نقطة' : 'نقطة'}`
-                : `This send: ${requiredCredits} ${requiredCredits === 2 ? 'credits' : 'credit'}`}
-            </span>
-          </div>
-
+        {/* Google AI Studio-Style Composer with Subtle Credit Cost Bar */}
+        <div className="px-3 pt-2.5 pb-3 border-t border-slate-200 bg-white space-y-2">
           {hasInsufficientCredits && (
             <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 text-xs">
               <span className="font-semibold">
@@ -895,7 +1049,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
               </span>
               <Link
                 href={`/${locale}/pricing`}
-                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors"
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors whitespace-nowrap"
               >
                 <span>{isArabic ? 'اشحن الآن' : 'Top up'}</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -907,26 +1061,28 @@ export function AIToolsClient({ locale }: { locale: string }) {
             className={
               isLoading
                 ? 'sa-glow-border-shell shadow-lg'
-                : 'rounded-2xl border border-slate-200 bg-white p-0.5 transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20'
+                : isListening
+                ? 'rounded-[26px] border border-rose-300 bg-white p-0.5 shadow-sm ring-2 ring-rose-500/15 transition-all'
+                : 'rounded-[26px] border border-slate-200 bg-slate-50/75 p-0.5 transition-all focus-within:border-slate-400 focus-within:bg-white focus-within:shadow-sm'
             }
           >
             {isLoading && <div className="sa-glow-border-spinner" aria-hidden="true" />}
 
-            <div className="relative z-10 rounded-[14px] bg-white p-2.5 space-y-2">
+            <div className="relative z-10 rounded-[24px] bg-white px-2.5 py-2 space-y-2">
               {/* Thumbnail / File Preview Before Send */}
               {attached && (
-                <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-gray-50 border border-slate-200">
+                <div className="flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-2xl bg-slate-50 border border-slate-200">
                   <div className="flex items-center gap-2.5 min-w-0">
                     {attached.previewImageUrl ? (
                       <img
                         src={attached.previewImageUrl}
                         alt={attached.name}
                         referrerPolicy="no-referrer"
-                        className="w-11 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
+                        className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
                       />
                     ) : (
-                      <div className="w-11 h-11 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
-                        <FileText className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-blue-600" />
                       </div>
                     )}
                     <div className="min-w-0">
@@ -943,19 +1099,21 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     type="button"
                     onClick={() => setAttached(null)}
                     aria-label="Remove attachment"
-                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                    className="p-1.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               )}
 
+              {/* Google AI Studio Input Row: Left (+), Middle (Textarea), Right (Mic + ArrowUp Send) */}
               <form
+                dir="ltr"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void handleSend();
                 }}
-                className="flex items-end gap-2"
+                className="flex items-end gap-1.5"
               >
                 <input
                   ref={fileInputRef}
@@ -965,17 +1123,18 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   className="hidden"
                 />
 
-                {/* Circular + Upload Button */}
+                {/* Left Side: Circular + Attach File Button */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={extractingFile || isLoading}
                   title={
                     isArabic
-                      ? 'رفع صورة (JPG, PNG, WebP) أو ملف (PDF, TXT)'
-                      : 'Upload image (JPG, PNG, WebP) or file (PDF, TXT)'
+                      ? 'إرفاق صورة (JPG, PNG, WebP) أو ملف (PDF, TXT)'
+                      : 'Attach image (JPG, PNG, WebP) or file (PDF, TXT)'
                   }
-                  className="w-10 h-10 rounded-full border border-slate-200 bg-gray-50 hover:bg-slate-100 hover:border-blue-400 text-slate-700 flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-50"
+                  aria-label={isArabic ? 'إرفاق ملف' : 'Attach file'}
+                  className="w-10 h-10 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   {extractingFile ? (
                     <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
@@ -984,8 +1143,11 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   )}
                 </button>
 
+                {/* Center: Clean Expanding Textarea */}
                 <textarea
-                  rows={2}
+                  ref={textareaRef}
+                  dir={contentDir}
+                  rows={1}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -995,27 +1157,119 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     }
                   }}
                   placeholder={
-                    isArabic
-                      ? 'اسأل SA AI أو اطلب تحليل الملف المرفق...'
-                      : 'Ask SA AI or analyze an attached file...'
+                    isListening
+                      ? isArabic
+                        ? `جارٍ الاستماع (${speechLang})... تكلّم الآن`
+                        : `Listening (${speechLang})... speak now`
+                      : isArabic
+                      ? 'اسأل SA AI أو اطلب تحليل ملف...'
+                      : 'Ask SA AI anything...'
                   }
-                  className="flex-1 resize-none border-0 bg-transparent px-2 py-2 text-base font-medium leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                  className="flex-1 min-h-[40px] max-h-[152px] resize-none border-0 bg-transparent px-1.5 py-2 text-sm sm:text-[15px] font-medium leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 />
 
-                <button
-                  type="submit"
-                  disabled={isLoading || extractingFile || (!input.trim() && !attached)}
-                  className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-                  aria-label="Send"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </button>
+                {/* Right Side (Physical Right in both LTR & RTL): Voice Mic + Circular Upward Arrow Send */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleToggleVoice}
+                    disabled={isLoading}
+                    aria-pressed={isListening}
+                    aria-label={
+                      isListening
+                        ? isArabic
+                          ? 'إيقاف الإدخال الصوتي'
+                          : 'Stop voice input'
+                        : isArabic
+                        ? 'الإدخال الصوتي'
+                        : 'Voice input'
+                    }
+                    title={
+                      isListening
+                        ? isArabic
+                          ? `إيقاف الاستماع (${speechLang})`
+                          : `Stop listening (${speechLang})`
+                        : isArabic
+                        ? `تحدّث للكتابة (${speechLang})`
+                        : `Speak to type (${speechLang})`
+                    }
+                    className={`relative w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                      isListening
+                        ? 'bg-rose-50 text-rose-600 ring-2 ring-rose-500/40'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    {isListening && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-0 rounded-full bg-rose-400/35 animate-ping"
+                      />
+                    )}
+                    <Mic
+                      className={`w-[18px] h-[18px] relative z-10 ${
+                        isListening ? 'animate-pulse text-rose-600' : ''
+                      }`}
+                    />
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!canSend}
+                    aria-label={isArabic ? 'إرسال' : 'Send'}
+                    title={isArabic ? 'إرسال الرسالة' : 'Send prompt'}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                      isLoading
+                        ? 'bg-slate-900 text-white cursor-wait'
+                        : canSend
+                        ? 'bg-slate-900 hover:bg-blue-600 text-white shadow-xs cursor-pointer active:scale-95'
+                        : 'bg-slate-200/80 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ArrowUp className="w-[18px] h-[18px] stroke-[2.25]" />
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
+          </div>
+
+          {/* Subtle Credit Cost & Voice Language Footer Below Input */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1.5 text-[11px] font-medium text-slate-500">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Coins className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="truncate">
+                {isArabic
+                  ? 'التكلفة: 1 نقطة للرسالة | 2 نقطة لتحليل PDF'
+                  : 'Cost: 1 credit/msg | 2 credits/PDF'}
+              </span>
+              {attached && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-semibold text-amber-700 tabular-nums whitespace-nowrap">
+                    {isArabic ? 'هذا الإرسال: 2 نقطة' : 'This send: 2 credits'}
+                  </span>
+                </>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (isListening) stopVoiceCapture();
+                setSpeechLang((prev) => (prev === 'ar-SA' ? 'en-US' : 'ar-SA'));
+              }}
+              title={
+                isArabic
+                  ? 'تبديل لغة الميكروفون (العربية / الإنجليزية)'
+                  : 'Switch voice recognition language (ar-SA / en-US)'
+              }
+              className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer tabular-nums whitespace-nowrap shrink-0"
+            >
+              {speechLang === 'ar-SA' ? 'Voice: AR (ar-SA)' : 'Voice: EN (en-US)'}
+            </button>
           </div>
         </div>
       </aside>
