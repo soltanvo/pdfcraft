@@ -691,8 +691,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </p>
                 <p className="text-sm sm:text-base leading-relaxed text-slate-600">
                   {isArabic
-                    ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اسأل عن أي أداة PDF وسيوجهك المساعد مباشرة إليها بسرعة فائقة بنموذج Gemini 2.5 Flash (نقطة واحدة لكل رسالة).'
-                    : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or ask how to use any SA AI tool for instant guidance powered by Gemini 2.5 Flash (1 credit per response).'}
+                    ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اسأل عن أي أداة PDF وسيوجهك المساعد مباشرة إليها بسرعة فائقة بنموذج Gemini 3.8 Flash (نقطة واحدة لكل رسالة).'
+                    : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or ask how to use any SA AI tool for instant guidance powered by Gemini 3.8 Flash (1 credit per response).'}
                 </p>
               </div>
 
@@ -1020,8 +1020,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 </h2>
                 <p className="text-sm text-slate-600 leading-relaxed">
                   {isArabic
-                    ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل والاختبارات وروابط الأدوات الفورية من Gemini 2.5 Flash مع إمكانية النسخ أو التصدير المباشر.'
-                    : 'Attached images, PDF previews, structured analysis, exams, and direct tool action links from Gemini 2.5 Flash stream here live ready to copy or export.'}
+                    ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل والاختبارات وروابط الأدوات الفورية من Gemini 3.8 Flash مع إمكانية النسخ أو التصدير المباشر.'
+                    : 'Attached images, PDF previews, structured analysis, exams, and direct tool action links from Gemini 3.8 Flash stream here live ready to copy or export.'}
                 </p>
               </div>
             </div>

@@ -12,8 +12,8 @@ interface ChatHistoryItem {
 
 const MAX_DOC_CHARS = 45000;
 const ALLOWED_IMAGE_REGEX = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i;
-const PRIMARY_GEMINI_MODEL = 'gemini-2.5-flash';
-const FALLBACK_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const PRIMARY_GEMINI_MODEL = 'gemini-3.8-flash';
+const FALLBACK_GEMINI_MODEL = 'gemini-3.1-flash-lite';
 
 const PLATFORM_TOOLS_CATALOG = TOOLS.map(
   (t) => `- ${t.name} | slug: ${t.slug} | category: ${t.category} | ${t.description}`
@@ -75,9 +75,12 @@ function shouldFallbackModel(err: unknown): boolean {
   const status = getErrorStatus(err);
   const msg = err instanceof Error ? err.message : String(err);
   return (
+    status === 404 ||
     status === 429 ||
     status === 503 ||
-    /429|503|resource[_\s-]?exhausted|unavailable|overloaded|rate[_\s-]?limit|quota/i.test(msg)
+    /404|429|503|not[_\s-]?found|unsupported model|resource[_\s-]?exhausted|unavailable|overloaded|rate[_\s-]?limit|quota/i.test(
+      msg
+    )
   );
 }
 
