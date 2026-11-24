@@ -232,7 +232,7 @@ const nextConfig = {
         ],
       },
       {
-        // Global security & caching headers for all routes (COOP same-origin-allow-popups; COEP omitted for Paddle CDN compatibility)
+        // Global security & caching headers for all routes (COOP/COEP removed so Google Auth & Paddle CDN are never blocked)
         source: '/:path*',
         headers: [
           {
@@ -246,10 +246,6 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin-allow-popups',
           },
           {
             key: 'Cross-Origin-Resource-Policy',

@@ -13,7 +13,6 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
@@ -84,12 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const activeDb = db;
 
     void testFirestoreConnection();
-    void getRedirectResult(activeAuth).catch((err: unknown) => {
-      const code = (err as { code?: string })?.code;
-      if (code && code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-        setError(err instanceof Error ? err.message : 'Google redirect sign-in failed');
-      }
-    });
+    void getRedirectResult(activeAuth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((err: unknown) => {
+        const code = (err as { code?: string })?.code;
+        if (code && code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+          setError(err instanceof Error ? err.message : 'Google redirect sign-in failed');
+        }
+      });
 
     let unsubscribeDoc: (() => void) | null = null;
 
@@ -204,36 +209,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      const cred = await signInWithPopup(auth, provider);
-      return cred.user;
-    } catch (err: unknown) {
-      const code = (err as { code?: string })?.code;
-      const message = err instanceof Error ? err.message : '';
-      const isPopupBlocked =
-        code === 'auth/popup-blocked' ||
-        code === 'auth/operation-not-supported-in-this-browser' ||
-        /popup/i.test(message) && /block/i.test(message);
-
-      if (isPopupBlocked) {
-        try {
-          await signInWithRedirect(auth, provider);
-          return null;
-        } catch (redirectErr: unknown) {
-          setError(
-            redirectErr instanceof Error
-              ? redirectErr.message
-              : 'Google redirect sign-in failed'
-          );
-          return null;
-        }
-      }
-
-      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-        setError(message || 'Google sign-in failed');
-      }
+      await signInWithRedirect(auth, provider);
       return null;
-    } finally {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      setError(message || 'Google redirect sign-in failed');
       setAuthBusy(false);
+      return null;
     }
   }, []);
 

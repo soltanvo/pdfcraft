@@ -229,17 +229,10 @@ export function PricingPageClient({ locale }: { locale: string }) {
     setOpeningPlan(plan.id);
 
     try {
-      let activeUser = user;
+      const activeUser = user;
       if (!activeUser) {
-        activeUser = await signInWithGoogle();
-        if (!activeUser) {
-          setErrorMsg(
-            isArabic
-              ? 'يرجى تسجيل الدخول بحساب Google أولاً لربط الاشتراك بحسابك.'
-              : 'Please sign in with Google first so your subscription is linked to your account.'
-          );
-          return;
-        }
+        await signInWithGoogle();
+        return;
       }
 
       let activePaddle = paddle;

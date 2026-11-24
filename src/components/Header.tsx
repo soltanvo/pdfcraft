@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { AlertCircle, Coins, Globe, LogIn, LogOut, Menu, User as UserIcon, X } from 'lucide-react';
 import { useState } from 'react';
 import { locales, localeConfig, type Locale } from '@/lib/i18n/config';
@@ -49,52 +49,23 @@ export function Header({ locale }: { locale: string }) {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      await signInWithPopup(auth, provider);
+      await signInWithRedirect(auth, provider);
     } catch (err: unknown) {
-      console.error('Google signInWithPopup error:', err);
+      console.error('Google signInWithRedirect error:', err);
       const code = (err as { code?: string })?.code;
       const message = err instanceof Error ? err.message : '';
-      const isPopupBlocked =
-        code === 'auth/popup-blocked' ||
-        code === 'auth/operation-not-supported-in-this-browser' ||
-        (/popup/i.test(message) && /block/i.test(message));
-
-      if (isPopupBlocked) {
-        try {
-          await signInWithRedirect(auth, provider);
-          return;
-        } catch (redirectErr: unknown) {
-          console.error('Google signInWithRedirect error:', redirectErr);
-          setLocalError(
-            redirectErr instanceof Error
-              ? redirectErr.message
-              : isArabic
-              ? 'تعذر فتح صفحة تسجيل الدخول بجوجل.'
-              : 'Could not open Google sign-in redirect.'
-          );
-          return;
-        }
-      }
-
       if (code === 'auth/unauthorized-domain') {
         setLocalError(
           isArabic
             ? 'هذا النطاق غير مضاف في Authorized domains داخل Firebase Authentication. أضف النطاق أو استخدم النطاق الرسمي.'
             : 'This domain is not authorized in Firebase Authentication Authorized Domains.'
         );
-      } else if (code === 'auth/popup-closed-by-user') {
-        setLocalError(
-          isArabic
-            ? 'تم إغلاق نافذة تسجيل الدخول قبل إتمام العملية.'
-            : 'Sign-in popup was closed before completing login.'
-        );
       } else {
         setLocalError(
           message ||
-            (isArabic ? 'حدث خطأ أثناء تسجيل الدخول بحساب Google.' : 'Google sign-in failed.')
+            (isArabic ? 'تعذر بدء تسجيل الدخول بحساب Google.' : 'Google sign-in redirect failed.')
         );
       }
-    } finally {
       setSigningIn(false);
     }
   };
