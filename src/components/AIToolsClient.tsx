@@ -399,6 +399,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
       minute: '2-digit',
     });
 
+    let aiSucceeded = false;
+
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
@@ -443,6 +445,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let sseBuffer = '';
+        let streamDone = false;
 
         const applyChunkText = (chunkText: string) => {
           fullReply += chunkText;
@@ -451,38 +454,60 @@ export function AIToolsClient({ locale }: { locale: string }) {
           );
         };
 
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          sseBuffer += decoder.decode(value, { stream: true });
+        try {
+          while (!streamDone) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            sseBuffer += decoder.decode(value, { stream: true });
 
-          const lines = sseBuffer.split('\n');
-          sseBuffer = lines.pop() ?? '';
+            const lines = sseBuffer.split('\n');
+            sseBuffer = lines.pop() ?? '';
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data:')) continue;
-            const jsonStr = trimmed.slice(5).trim();
-            if (!jsonStr || jsonStr === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(jsonStr) as {
-                text?: string;
-                error?: string;
-                done?: boolean;
-              };
-              if (parsed.error) {
-                streamError = parsed.error;
-              } else if (parsed.text) {
-                applyChunkText(parsed.text);
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data:')) continue;
+              const jsonStr = trimmed.slice(5).trim();
+              if (!jsonStr) continue;
+              if (jsonStr === '[DONE]') {
+                streamDone = true;
+                break;
               }
-            } catch {
-              // Ignore partial SSE JSON
+              try {
+                const parsed = JSON.parse(jsonStr) as {
+                  text?: string;
+                  error?: string;
+                  done?: boolean;
+                };
+                if (parsed.error) {
+                  streamError = parsed.error;
+                  streamDone = true;
+                  break;
+                }
+                if (parsed.text) {
+                  applyChunkText(parsed.text);
+                }
+                if (parsed.done) {
+                  streamDone = true;
+                  break;
+                }
+              } catch {
+                // Ignore partial SSE JSON
+              }
             }
+          }
+        } finally {
+          if (streamDone) {
+            void reader.cancel().catch(() => {});
+          }
+          try {
+            reader.releaseLock();
+          } catch {
+            // Ignore if already released
           }
         }
 
         const trailing = sseBuffer.trim();
-        if (trailing.startsWith('data:')) {
+        if (!streamDone && trailing.startsWith('data:')) {
           try {
             const parsed = JSON.parse(trailing.slice(5).trim()) as {
               text?: string;
@@ -522,12 +547,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
         setActiveResultId(assistantId);
       }
 
-      try {
-        await deductCredit();
-      } catch (deductErr) {
-        console.warn('Firestore credit deduction failed (AI response kept):', deductErr);
-      }
-
+      aiSucceeded = true;
       if (streamError) {
         setError(streamError);
       }
@@ -535,6 +555,12 @@ export function AIToolsClient({ locale }: { locale: string }) {
       setError(err instanceof Error ? err.message : 'Failed to generate AI response.');
     } finally {
       setIsLoading(false);
+    }
+
+    if (aiSucceeded) {
+      void deductCredit().catch((deductErr) => {
+        console.warn('Firestore credit deduction failed (AI response kept):', deductErr);
+      });
     }
   };
 
