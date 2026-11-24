@@ -217,15 +217,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
     if (!promptText && !attached) return;
 
     if (!user) {
-      const signedIn = await signInWithGoogle();
-      if (!signedIn) {
-        setError(
-          isArabic
-            ? 'يرجى تسجيل الدخول بحساب Google لاستخدام مساعد الذكاء الاصطناعي.'
-            : 'Please sign in with Google to use AI Studio.'
-        );
-        return;
-      }
+      await signInWithGoogle();
+      return;
     }
 
     if (credits < 1) {
@@ -254,7 +247,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/ai/', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

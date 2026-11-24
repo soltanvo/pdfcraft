@@ -1,4 +1,7 @@
+import { GoogleGenAI, type Content, type Part } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+
+export const runtime = 'nodejs';
 
 interface ChatHistoryItem {
   role: 'user' | 'assistant';
@@ -6,16 +9,31 @@ interface ChatHistoryItem {
 }
 
 const MAX_DOC_CHARS = 45000;
-const ALLOWED_IMAGE_PREFIX = /^data:image\/(jpeg|jpg|png|webp);base64,/i;
+const ALLOWED_IMAGE_REGEX = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i;
+const PRIMARY_GEMINI_MODEL = 'gemini-4-hydrogen';
+const FALLBACK_GEMINI_MODEL = 'gemini-2.5-flash';
+
+function sanitizeEnv(value: string | undefined): string {
+  if (!value) return '';
+  return value.trim().replace(/^["']+|["']+$/g, '').trim();
+}
+
+function getErrorStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const maybeStatus = (err as { status?: unknown; code?: unknown }).status ?? (err as { code?: unknown }).code;
+  if (typeof maybeStatus === 'number') return maybeStatus;
+  if (typeof maybeStatus === 'string' && /^\d+$/.test(maybeStatus)) return Number(maybeStatus);
+  return undefined;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = sanitizeEnv(process.env.GEMINI_API_KEY);
     if (!apiKey) {
       return NextResponse.json(
         {
           error:
-            'OPENROUTER_API_KEY is not configured on the server. Add OPENROUTER_API_KEY in environment secrets.',
+            'GEMINI_API_KEY is not configured on the server. Add GEMINI_API_KEY in environment secrets.',
         },
         { status: 500 }
       );
@@ -38,11 +56,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (body.imageDataUrl && !ALLOWED_IMAGE_PREFIX.test(body.imageDataUrl)) {
-      return NextResponse.json(
-        { error: 'Unsupported image format. Please use JPG, PNG, or WebP.' },
-        { status: 400 }
-      );
+    let imageInlinePart: Part | null = null;
+    if (body.imageDataUrl) {
+      const match = body.imageDataUrl.trim().match(ALLOWED_IMAGE_REGEX);
+      if (!match) {
+        return NextResponse.json(
+          { error: 'Unsupported image format. Please use JPG, PNG, or WebP.' },
+          { status: 400 }
+        );
+      }
+      const mimeType = match[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : match[1].toLowerCase();
+      imageInlinePart = {
+        inlineData: {
+          mimeType,
+          data: match[2],
+        },
+      };
     }
 
     const systemLanguage =
@@ -50,12 +79,9 @@ export async function POST(req: NextRequest) {
         ? 'Respond clearly in Arabic unless the user explicitly asks for another language. Use structured Markdown headings and bullet points when helpful.'
         : 'Respond clearly and concisely in the user’s language using structured Markdown when helpful.';
 
-    const systemMessage = {
-      role: 'system' as const,
-      content: `You are SA AI, an expert document, PDF, and visual analysis assistant. ${systemLanguage}`,
-    };
+    const systemInstruction = `You are SA AI, an expert document, PDF, and visual analysis assistant. ${systemLanguage}`;
 
-    const historyMessages = Array.isArray(body.history)
+    const historyContents: Content[] = Array.isArray(body.history)
       ? body.history
           .slice(-8)
           .filter(
@@ -66,8 +92,8 @@ export async function POST(req: NextRequest) {
               m.content.trim().length > 0
           )
           .map((m) => ({
-            role: m.role,
-            content: m.content.slice(0, 8000),
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content.slice(0, 8000) }],
           }))
       : [];
 
@@ -77,61 +103,84 @@ export async function POST(req: NextRequest) {
         : '';
 
     const combinedText = `${prompt || 'Please analyze the attached content.'}${docContext}`;
-
-    const userMessageContent = body.imageDataUrl
-      ? [
-          { type: 'text' as const, text: combinedText },
-          { type: 'image_url' as const, image_url: { url: body.imageDataUrl } },
-        ]
-      : combinedText;
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'https://sa-ai.app',
-        'X-Title': 'SA AI Platform',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-001',
-        messages: [
-          systemMessage,
-          ...historyMessages,
-          { role: 'user', content: userMessageContent },
-        ],
-        temperature: 0.4,
-        max_tokens: 4096,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      console.error('OpenRouter error:', response.status, errText);
-      return NextResponse.json(
-        { error: `AI service error (${response.status}). Please try again.` },
-        { status: 502 }
-      );
+    const currentParts: Part[] = [{ text: combinedText }];
+    if (imageInlinePart) {
+      currentParts.push(imageInlinePart);
     }
 
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      model?: string;
-      usage?: unknown;
-    };
+    const contents: Content[] = [
+      ...historyContents,
+      { role: 'user', parts: currentParts },
+    ];
 
-    const reply = data.choices?.[0]?.message?.content?.trim();
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    const configuredModel = sanitizeEnv(process.env.GEMINI_MODEL) || PRIMARY_GEMINI_MODEL;
+    let usedModel = configuredModel;
+    let response;
+
+    try {
+      response = await ai.models.generateContent({
+        model: usedModel,
+        contents,
+        config: {
+          systemInstruction,
+        },
+      });
+    } catch (primaryErr) {
+      const status = getErrorStatus(primaryErr);
+      const errMessage = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+      const isModelNotFound =
+        status === 404 || /not[_\s-]?found|404|unsupported model/i.test(errMessage);
+
+      if (isModelNotFound && usedModel !== FALLBACK_GEMINI_MODEL) {
+        usedModel = FALLBACK_GEMINI_MODEL;
+        response = await ai.models.generateContent({
+          model: usedModel,
+          contents,
+          config: {
+            systemInstruction,
+          },
+        });
+      } else {
+        throw primaryErr;
+      }
+    }
+
+    const reply = response.text?.trim();
     if (!reply) {
       return NextResponse.json({ error: 'Empty response from AI model.' }, { status: 502 });
     }
 
     return NextResponse.json({
       reply,
-      model: data.model || 'google/gemini-2.0-flash-001',
-      usage: data.usage || null,
+      model: usedModel,
+      usage: response.usageMetadata || null,
     });
   } catch (err) {
-    console.error('AI route exception:', err);
-    return NextResponse.json({ error: 'Failed to process AI request.' }, { status: 500 });
+    console.error('Gemini AI route error:', err);
+    const status = getErrorStatus(err);
+    const rawMsg = err instanceof Error ? err.message : 'Failed to process AI request.';
+    let cleanMsg = rawMsg;
+    try {
+      const parsed = JSON.parse(rawMsg) as { error?: { message?: string } };
+      if (parsed?.error?.message) {
+        cleanMsg = parsed.error.message;
+      }
+    } catch {
+      // Non-JSON error message; keep rawMsg
+    }
+    const safeStatus = status && status >= 400 && status < 600 ? status : 502;
+    return NextResponse.json(
+      { error: `AI service error (${safeStatus}): ${cleanMsg}` },
+      { status: safeStatus }
+    );
   }
 }

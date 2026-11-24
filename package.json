@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@google/genai": "^3.6.1",
     "@matbee/libreoffice-converter": "^2.5.0",
     "@paddle/paddle-js": "^1.6.6",
     "@paypal/react-paypal-js": "^10.6.1",
