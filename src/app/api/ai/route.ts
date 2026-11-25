@@ -1,9 +1,10 @@
-import { GoogleGenAI, type Content, type Part } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, type Content, type GenerateContentConfig, type Part } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidLocale } from '@/lib/i18n/config';
 import { TOOLS } from '@/lib/tools/registry';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 interface ChatHistoryItem {
   role: 'user' | 'assistant';
@@ -11,9 +12,14 @@ interface ChatHistoryItem {
 }
 
 const MAX_DOC_CHARS = 45000;
+const MAX_OUTPUT_TOKENS = 8192;
 const ALLOWED_IMAGE_REGEX = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i;
 const PRIMARY_GEMINI_MODEL = 'gemini-2.5-flash';
-const FALLBACK_GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_GEMINI_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-4-hydrogen',
+  'gemini-3.5-flash-lite',
+] as const;
 
 const PLATFORM_TOOLS_CATALOG = TOOLS.map(
   (t) => `- ${t.name} | slug: ${t.slug} | category: ${t.category} | ${t.description}`
@@ -77,11 +83,31 @@ function shouldFallbackModel(err: unknown): boolean {
   return (
     status === 404 ||
     status === 429 ||
+    status === 500 ||
+    status === 502 ||
     status === 503 ||
-    /404|429|503|not[_\s-]?found|unsupported model|resource[_\s-]?exhausted|unavailable|overloaded|rate[_\s-]?limit|quota/i.test(
+    status === 504 ||
+    /404|429|500|502|503|504|not[_\s-]?found|unsupported model|resource[_\s-]?exhausted|unavailable|high demand|overloaded|rate[_\s-]?limit|quota|timeout|terminated|econnreset/i.test(
       msg
     )
   );
+}
+
+function buildModelConfig(modelName: string, systemInstruction: string): GenerateContentConfig {
+  const config: GenerateContentConfig = {
+    systemInstruction,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+  };
+
+  if (modelName.startsWith('gemini-2.5')) {
+    config.thinkingConfig = { thinkingBudget: 0 };
+  } else if (modelName.startsWith('gemini-4')) {
+    config.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
+  } else if (modelName === 'gemini-3.1-flash-lite') {
+    config.thinkingConfig = { thinkingLevel: ThinkingLevel.MINIMAL };
+  }
+
+  return config;
 }
 
 function buildSystemInstruction(locale: string): string {
@@ -146,35 +172,27 @@ function buildSystemInstruction(locale: string): string {
 
 async function startStreamWithFallback(
   ai: GoogleGenAI,
-  primaryModel: string,
-  fallbackModel: string,
+  candidateModels: string[],
+  startIndex: number,
   contents: Content[],
   systemInstruction: string
 ) {
-  const openForModel = async (modelName: string) => {
-    const useZeroThinkingBudget = modelName.startsWith('gemini-2.5-flash');
+  const openForModel = async (modelName: string, candidateIndex: number) => {
     const stream = await ai.models.generateContentStream({
       model: modelName,
       contents,
-      config: {
-        systemInstruction,
-        ...(useZeroThinkingBudget ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-      },
+      config: buildModelConfig(modelName, systemInstruction),
     });
     const iterator = stream[Symbol.asyncIterator]();
     const first = await iterator.next();
-    return { iterator, first, modelName };
+    return { iterator, first, modelName, candidateIndex };
   };
 
-  const candidateModels = Array.from(
-    new Set([primaryModel, fallbackModel, 'gemini-4-hydrogen'].filter(Boolean))
-  );
-
   let lastErr: unknown;
-  for (let i = 0; i < candidateModels.length; i++) {
+  for (let i = startIndex; i < candidateModels.length; i++) {
     const candidate = candidateModels[i];
     try {
-      return await openForModel(candidate);
+      return await openForModel(candidate, i);
     } catch (err) {
       lastErr = err;
       const hasNext = i < candidateModels.length - 1;
@@ -283,10 +301,14 @@ export async function POST(req: NextRequest) {
     });
 
     const configuredModel = sanitizeEnv(process.env.GEMINI_MODEL) || PRIMARY_GEMINI_MODEL;
-    const { iterator, first, modelName } = await startStreamWithFallback(
+    const candidateModels = Array.from(
+      new Set([configuredModel, PRIMARY_GEMINI_MODEL, ...FALLBACK_GEMINI_MODELS].filter(Boolean))
+    );
+
+    const initialStream = await startStreamWithFallback(
       ai,
-      configuredModel,
-      FALLBACK_GEMINI_MODEL,
+      candidateModels,
+      0,
       contents,
       systemInstruction
     );
@@ -294,33 +316,114 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let streamClosed = false;
         const sendEvent = (payload: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          if (streamClosed || req.signal.aborted) return;
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          } catch {
+            streamClosed = true;
+          }
         };
 
-        let emittedChars = 0;
+        let activeIterator = initialStream.iterator;
+        let current = initialStream.first;
+        let activeModelName = initialStream.modelName;
+        let activeIndex = initialStream.candidateIndex;
+        let emittedText = '';
+        let midStreamRecoveries = 0;
+
         try {
-          let current = first;
-          while (!current.done) {
-            const chunkText = current.value?.text;
-            if (chunkText) {
-              emittedChars += chunkText.length;
-              sendEvent({ text: chunkText });
+          while (!req.signal.aborted) {
+            try {
+              while (!current.done) {
+                if (req.signal.aborted) break;
+                const chunkText = current.value?.text;
+                if (chunkText) {
+                  emittedText += chunkText;
+                  sendEvent({ text: chunkText });
+                }
+                current = await activeIterator.next();
+              }
+              break;
+            } catch (streamErr) {
+              const canRecoverMidStream =
+                shouldFallbackModel(streamErr) &&
+                activeIndex + 1 < candidateModels.length &&
+                midStreamRecoveries < 2;
+
+              if (!canRecoverMidStream || req.signal.aborted) {
+                throw streamErr;
+              }
+
+              midStreamRecoveries += 1;
+              try {
+                await activeIterator.return?.(undefined);
+              } catch {
+                // Ignore iterator cleanup failure
+              }
+
+              const continuationContents: Content[] = emittedText
+                ? [
+                    ...contents,
+                    { role: 'model', parts: [{ text: emittedText }] },
+                    {
+                      role: 'user',
+                      parts: [
+                        {
+                          text:
+                            locale === 'ar'
+                              ? 'أكمل الإجابة من النقطة التي توقفت عندها بالضبط دون تكرار أي جزء سابق.'
+                              : 'Continue the response seamlessly from the exact point where you stopped without repeating previous text.',
+                        },
+                      ],
+                    },
+                  ]
+                : contents;
+
+              const nextStream = await startStreamWithFallback(
+                ai,
+                candidateModels,
+                activeIndex + 1,
+                continuationContents,
+                systemInstruction
+              );
+
+              activeIterator = nextStream.iterator;
+              current = nextStream.first;
+              activeModelName = nextStream.modelName;
+              activeIndex = nextStream.candidateIndex;
             }
-            current = await iterator.next();
           }
 
-          if (emittedChars === 0) {
-            sendEvent({ error: 'Empty response from AI model.' });
-          } else {
-            sendEvent({ done: true, model: modelName });
+          if (!req.signal.aborted) {
+            if (!emittedText) {
+              sendEvent({ error: 'Empty response from AI model.' });
+            } else {
+              sendEvent({ done: true, model: activeModelName });
+            }
           }
         } catch (streamErr) {
           const formatted = formatGeminiError(streamErr);
           sendEvent({ error: formatted.message });
         } finally {
-          controller.close();
+          try {
+            await activeIterator.return?.(undefined);
+          } catch {
+            // Ignore cleanup failure
+          }
+          if (!streamClosed) {
+            streamClosed = true;
+            try {
+              controller.close();
+            } catch {
+              // Stream already closed or cancelled
+            }
+          }
         }
+      },
+      cancel() {
+        // Client aborted request; finally block closes cleanly
       },
     });
 
@@ -330,7 +433,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
-        'X-AI-Model': modelName,
+        'X-AI-Model': initialStream.modelName,
       },
     });
   } catch (err) {

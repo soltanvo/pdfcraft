@@ -318,6 +318,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const voiceBaseInputRef = useRef('');
   const requiredCredits: 1 | 2 = attached ? 2 : 1;
   const hasInsufficientCredits = Boolean(user && profile && credits < requiredCredits);
@@ -340,6 +341,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
         // Ignore cleanup errors
       }
       recognitionRef.current = null;
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
     };
   }, []);
 
@@ -625,11 +628,38 @@ export function AIToolsClient({ locale }: { locale: string }) {
     });
 
     let aiSucceeded = false;
+    let fullReply = '';
+    let timedOut = false;
+
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const OVERALL_TIMEOUT_MS = 65000;
+    const INACTIVITY_TIMEOUT_MS = 30000;
+
+    let overallTimer: ReturnType<typeof setTimeout> | null = null;
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        timedOut = true;
+        abortController.abort();
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    overallTimer = setTimeout(() => {
+      timedOut = true;
+      abortController.abort();
+    }, OVERALL_TIMEOUT_MS);
+    resetInactivityTimer();
 
     try {
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({
           prompt: userMsg.content,
           history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
@@ -652,7 +682,6 @@ export function AIToolsClient({ locale }: { locale: string }) {
       }
 
       const contentType = res.headers.get('content-type') || '';
-      let fullReply = '';
       let streamError: string | null = null;
 
       if (contentType.includes('text/event-stream') && res.body) {
@@ -682,7 +711,12 @@ export function AIToolsClient({ locale }: { locale: string }) {
         try {
           while (!streamDone) {
             const { value, done } = await reader.read();
-            if (done) break;
+            if (done) {
+              sseBuffer += decoder.decode();
+              setIsLoading(false);
+              break;
+            }
+            resetInactivityTimer();
             sseBuffer += decoder.decode(value, { stream: true });
 
             const lines = sseBuffer.split('\n');
@@ -695,6 +729,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
               if (!jsonStr) continue;
               if (jsonStr === '[DONE]') {
                 streamDone = true;
+                setIsLoading(false);
                 break;
               }
               try {
@@ -706,6 +741,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 if (parsed.error) {
                   streamError = parsed.error;
                   streamDone = true;
+                  setIsLoading(false);
                   break;
                 }
                 if (parsed.text) {
@@ -713,6 +749,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 }
                 if (parsed.done) {
                   streamDone = true;
+                  setIsLoading(false);
                   break;
                 }
               } catch {
@@ -777,8 +814,30 @@ export function AIToolsClient({ locale }: { locale: string }) {
         setError(streamError);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate AI response.');
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      if (isAbort && !timedOut) {
+        // User cleared chat or navigated away; do not show error
+      } else if (timedOut) {
+        if (fullReply.trim()) {
+          aiSucceeded = true;
+        }
+        setError(
+          isArabic
+            ? 'انتهت مهلة الاتصال أثناء البث. إذا ظهر جزء من الإجابة، يمكنك طلب إكمالها برسالة قصيرة.'
+            : 'The response stream timed out. If a partial answer appeared, you can ask SA AI to continue.'
+        );
+      } else {
+        if (!fullReply.trim()) {
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        }
+        setError(err instanceof Error ? err.message : 'Failed to generate AI response.');
+      }
     } finally {
+      if (overallTimer) clearTimeout(overallTimer);
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
       setIsLoading(false);
     }
 
@@ -920,6 +979,9 @@ export function AIToolsClient({ locale }: { locale: string }) {
               <button
                 type="button"
                 onClick={() => {
+                  abortControllerRef.current?.abort();
+                  abortControllerRef.current = null;
+                  setIsLoading(false);
                   setMessages([]);
                   setActiveResultId(null);
                   setError(null);
