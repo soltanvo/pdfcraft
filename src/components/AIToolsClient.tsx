@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/components/AuthProvider';
+import { UpgradeCreditsModal } from '@/components/UpgradeCreditsModal';
 import { db } from '@/lib/firebase/config';
 import { extractPdfTextByPage, renderPdfPageToCanvas } from '@/lib/pdf/pdfjs';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -306,6 +307,11 @@ export function AIToolsClient({ locale }: { locale: string }) {
   const [copied, setCopied] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechLang, setSpeechLang] = useState<'ar-SA' | 'en-US'>(isArabic ? 'ar-SA' : 'en-US');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeCreditInfo, setUpgradeCreditInfo] = useState<{
+    available: number;
+    required: 1 | 2;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -572,6 +578,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
     }
 
     if (availableCredits < requestCost) {
+      setUpgradeCreditInfo({ available: availableCredits, required: requestCost });
+      setShowUpgradeModal(true);
       setError(
         isArabic
           ? availableCredits === 1 && requestCost === 2
@@ -1047,26 +1055,26 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   ? 'PDF analysis requires 2 credits (Balance: 1)'
                   : 'Insufficient credits — top up to continue'}
               </span>
-              <Link
-                href={`/${locale}/pricing`}
-                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors whitespace-nowrap"
+              <button
+                type="button"
+                onClick={() => {
+                  setUpgradeCreditInfo({ available: credits, required: requiredCredits });
+                  setShowUpgradeModal(true);
+                }}
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors whitespace-nowrap cursor-pointer"
               >
-                <span>{isArabic ? 'اشحن الآن' : 'Top up'}</span>
+                <span>{isArabic ? 'اشحن الآن' : 'Upgrade'}</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
+              </button>
             </div>
           )}
 
           <div
-            className={
-              isLoading
-                ? 'sa-glow-border-shell shadow-lg'
-                : isListening
-                ? 'rounded-[26px] border border-rose-300 bg-white p-0.5 shadow-sm ring-2 ring-rose-500/15 transition-all'
-                : 'rounded-[26px] border border-slate-200 bg-slate-50/75 p-0.5 transition-all focus-within:border-slate-400 focus-within:bg-white focus-within:shadow-sm'
-            }
+            data-active={isLoading || isListening || Boolean(attached) ? 'true' : 'false'}
+            data-loading={isLoading ? 'true' : 'false'}
+            className="sa-ai-composer-shell"
           >
-            {isLoading && <div className="sa-glow-border-spinner" aria-hidden="true" />}
+            <div className="sa-ai-composer-glow" aria-hidden="true" />
 
             <div className="relative z-10 rounded-[24px] bg-white px-2.5 py-2 space-y-2">
               {/* Thumbnail / File Preview Before Send */}
@@ -1387,6 +1395,13 @@ export function AIToolsClient({ locale }: { locale: string }) {
           )}
         </div>
       </section>
+      <UpgradeCreditsModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        locale={locale}
+        availableCredits={upgradeCreditInfo?.available ?? credits}
+        requiredCredits={upgradeCreditInfo?.required ?? requiredCredits}
+      />
     </div>
   );
 }
