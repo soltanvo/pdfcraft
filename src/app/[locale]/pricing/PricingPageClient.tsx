@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { auth } from '@/lib/firebase/config';
 import {
   loadPaddleScriptDirect,
   PAID_PLANS,
@@ -100,8 +101,8 @@ export function PricingPageClient({ locale }: { locale: string }) {
     setOpeningPlan(plan.id);
 
     try {
-      const activeUser = user;
-      if (!activeUser) {
+      const currentUser = auth?.currentUser || user;
+      if (!currentUser) {
         await signInWithGoogle();
         return;
       }
@@ -162,9 +163,9 @@ export function PricingPageClient({ locale }: { locale: string }) {
 
       activePaddle.Checkout.open({
         items: [{ priceId: selectedPriceId, quantity: 1 }],
-        customer: activeUser.email ? { email: activeUser.email } : undefined,
+        customer: currentUser.email ? { email: currentUser.email } : undefined,
         customData: {
-          userId: activeUser.uid,
+          userId: currentUser.uid,
           plan: selectedPlan,
         },
         settings: {

@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { auth } from '@/lib/firebase/config';
 import {
   getOrInitPaddleInstance,
   PAID_PLANS,
@@ -96,7 +97,8 @@ export function UpgradeCreditsModal({
     setOpeningPlan(plan.id);
 
     try {
-      if (!user) {
+      const currentUser = auth?.currentUser || user;
+      if (!currentUser) {
         await signInWithGoogle();
         return;
       }
@@ -132,9 +134,9 @@ export function UpgradeCreditsModal({
 
       activePaddle.Checkout.open({
         items: [{ priceId: plan.priceId, quantity: 1 }],
-        customer: user.email ? { email: user.email } : undefined,
+        customer: currentUser.email ? { email: currentUser.email } : undefined,
         customData: {
-          userId: user.uid,
+          userId: currentUser.uid,
           plan: plan.id,
         },
         settings: {

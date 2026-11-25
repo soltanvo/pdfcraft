@@ -134,6 +134,52 @@
         "status",
         "createdAt"
       ]
+    },
+    "ProcessedTransaction": {
+      "title": "ProcessedTransaction",
+      "description": "Idempotency ledger of processed Paddle transaction IDs written exclusively by the server webhook",
+      "type": "object",
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "description": "Paddle transaction ID",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Credited user UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "planId": {
+          "type": "string",
+          "enum": ["starter", "pro"],
+          "description": "Credited plan identifier"
+        },
+        "creditsAdded": {
+          "type": "integer",
+          "description": "Credits granted (30 or 100)"
+        },
+        "amountUsd": {
+          "type": "number",
+          "description": "USD amount paid"
+        },
+        "processedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server processing timestamp"
+        }
+      },
+      "required": [
+        "transaction_id",
+        "userId",
+        "planId",
+        "creditsAdded",
+        "amountUsd",
+        "processedAt"
+      ]
     }
   },
   "firestore": {
@@ -148,6 +194,12 @@
         "$ref": "#/entities/CreditTransaction"
       },
       "description": "Stores verified subscription transaction history for the owning user"
+    },
+    "/processed_transactions/{transactionId}": {
+      "schema": {
+        "$ref": "#/entities/ProcessedTransaction"
+      },
+      "description": "Server-only idempotency log preventing duplicate credit grants for Paddle webhooks"
     }
   }
 }
