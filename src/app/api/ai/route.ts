@@ -4,6 +4,7 @@ import { isValidLocale } from '@/lib/i18n/config';
 import { TOOLS } from '@/lib/tools/registry';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 interface ChatHistoryItem {
@@ -305,35 +306,47 @@ export async function POST(req: NextRequest) {
       new Set([configuredModel, PRIMARY_GEMINI_MODEL, ...FALLBACK_GEMINI_MODELS].filter(Boolean))
     );
 
-    const initialStream = await startStreamWithFallback(
-      ai,
-      candidateModels,
-      0,
-      contents,
-      systemInstruction
-    );
-
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         let streamClosed = false;
-        const sendEvent = (payload: Record<string, unknown>) => {
+        const enqueueRaw = (rawText: string) => {
           if (streamClosed || req.signal.aborted) return;
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+            controller.enqueue(encoder.encode(rawText));
           } catch {
             streamClosed = true;
           }
         };
+        const sendEvent = (payload: Record<string, unknown>) => {
+          enqueueRaw(`data: ${JSON.stringify(payload)}\n\n`);
+        };
 
-        let activeIterator = initialStream.iterator;
-        let current = initialStream.first;
-        let activeModelName = initialStream.modelName;
-        let activeIndex = initialStream.candidateIndex;
+        // Immediately flush SSE stream start so reverse proxies & browsers never buffer headers
+        enqueueRaw(': stream-open\n\n');
+
+        let activeIterator: AsyncGenerator<
+          Awaited<ReturnType<typeof startStreamWithFallback>>['first']['value'],
+          void,
+          unknown
+        > | null = null;
         let emittedText = '';
         let midStreamRecoveries = 0;
 
         try {
+          const initialStream = await startStreamWithFallback(
+            ai,
+            candidateModels,
+            0,
+            contents,
+            systemInstruction
+          );
+
+          activeIterator = initialStream.iterator;
+          let current = initialStream.first;
+          let activeModelName = initialStream.modelName;
+          let activeIndex = initialStream.candidateIndex;
+
           while (!req.signal.aborted) {
             try {
               while (!current.done) {
@@ -358,7 +371,7 @@ export async function POST(req: NextRequest) {
 
               midStreamRecoveries += 1;
               try {
-                await activeIterator.return?.(undefined);
+                await activeIterator?.return?.(undefined);
               } catch {
                 // Ignore iterator cleanup failure
               }
@@ -408,7 +421,7 @@ export async function POST(req: NextRequest) {
           sendEvent({ error: formatted.message });
         } finally {
           try {
-            await activeIterator.return?.(undefined);
+            await activeIterator?.return?.(undefined);
           } catch {
             // Ignore cleanup failure
           }
@@ -433,7 +446,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
-        'X-AI-Model': initialStream.modelName,
+        'X-Accel-Buffering': 'no',
       },
     });
   } catch (err) {
