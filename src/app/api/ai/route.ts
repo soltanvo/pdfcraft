@@ -13,7 +13,7 @@ interface ChatHistoryItem {
 const MAX_DOC_CHARS = 45000;
 const ALLOWED_IMAGE_REGEX = /^data:(image\/(?:jpeg|jpg|png|webp));base64,([A-Za-z0-9+/=]+)$/i;
 const PRIMARY_GEMINI_MODEL = 'gemini-2.5-flash';
-const FALLBACK_GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const FALLBACK_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 
 const PLATFORM_TOOLS_CATALOG = TOOLS.map(
   (t) => `- ${t.name} | slug: ${t.slug} | category: ${t.category} | ${t.description}`
@@ -166,14 +166,25 @@ async function startStreamWithFallback(
     return { iterator, first, modelName };
   };
 
-  try {
-    return await openForModel(primaryModel);
-  } catch (primaryErr) {
-    if (shouldFallbackModel(primaryErr) && primaryModel !== fallbackModel) {
-      return await openForModel(fallbackModel);
+  const candidateModels = Array.from(
+    new Set([primaryModel, fallbackModel, 'gemini-4-hydrogen'].filter(Boolean))
+  );
+
+  let lastErr: unknown;
+  for (let i = 0; i < candidateModels.length; i++) {
+    const candidate = candidateModels[i];
+    try {
+      return await openForModel(candidate);
+    } catch (err) {
+      lastErr = err;
+      const hasNext = i < candidateModels.length - 1;
+      if (hasNext && shouldFallbackModel(err)) {
+        continue;
+      }
+      throw err;
     }
-    throw primaryErr;
   }
+  throw lastErr;
 }
 
 export async function POST(req: NextRequest) {

@@ -168,7 +168,7 @@ function renderInlineMarkdown(text: string, standaloneLink = false): React.React
 
     if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
       return (
-        <strong key={idx} className="font-bold text-slate-900">
+        <strong key={idx} className="font-bold text-slate-900 dark:text-white">
           {part.slice(2, -2)}
         </strong>
       );
@@ -179,7 +179,7 @@ function renderInlineMarkdown(text: string, standaloneLink = false): React.React
         <code
           key={idx}
           dir="ltr"
-          className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 text-xs font-mono"
+          className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-mono"
         >
           {part.slice(1, -1)}
         </code>
@@ -195,7 +195,7 @@ function SafeMarkdownView({ content }: { content: string }) {
   const codeMatches = content.match(/```[\s\S]*?```/g) || [];
 
   return (
-    <div className="space-y-4 text-base font-medium leading-8 text-slate-800">
+    <div className="space-y-4 text-base font-medium leading-8 text-slate-800 dark:text-slate-200">
       {blocks.map((block, bIdx) => (
         <div key={bIdx} className="space-y-3">
           {block
@@ -208,7 +208,7 @@ function SafeMarkdownView({ content }: { content: string }) {
                 return (
                   <h4
                     key={lIdx}
-                    className="text-lg font-bold text-slate-900 mt-4 pt-3 border-t border-slate-100 first:mt-0 first:pt-0 first:border-t-0"
+                    className="text-lg font-bold text-slate-900 dark:text-white mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 first:mt-0 first:pt-0 first:border-t-0"
                   >
                     {renderInlineMarkdown(trimmed.slice(4))}
                   </h4>
@@ -218,7 +218,7 @@ function SafeMarkdownView({ content }: { content: string }) {
                 return (
                   <h3
                     key={lIdx}
-                    className="text-xl font-extrabold text-slate-900 mt-4 pt-3 border-t border-slate-200 first:mt-0 first:pt-0 first:border-t-0"
+                    className="text-xl font-extrabold text-slate-900 dark:text-white mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 first:mt-0 first:pt-0 first:border-t-0"
                   >
                     {renderInlineMarkdown(trimmed.slice(3))}
                   </h3>
@@ -226,7 +226,7 @@ function SafeMarkdownView({ content }: { content: string }) {
               }
               if (trimmed.startsWith('# ')) {
                 return (
-                  <h2 key={lIdx} className="text-2xl font-extrabold text-slate-900 pt-1">
+                  <h2 key={lIdx} className="text-2xl font-extrabold text-slate-900 dark:text-white pt-1">
                     {renderInlineMarkdown(trimmed.slice(2))}
                   </h2>
                 );
@@ -236,7 +236,7 @@ function SafeMarkdownView({ content }: { content: string }) {
                 const isOnlyLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(body.trim());
                 return (
                   <div key={lIdx} className="flex items-start gap-2.5 ps-3">
-                    <span className="text-amber-600 font-bold mt-0.5">•</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-bold mt-0.5">•</span>
                     <div className="flex-1">{renderInlineMarkdown(body, isOnlyLink)}</div>
                   </div>
                 );
@@ -246,7 +246,7 @@ function SafeMarkdownView({ content }: { content: string }) {
                 const isOnlyLink = /^\[[^\]]+\]\([^)\s]+\)$/.test(orderedMatch[2].trim());
                 return (
                   <div key={lIdx} className="flex items-start gap-2.5 ps-2 pt-1">
-                    <span className="text-slate-900 font-bold tabular-nums shrink-0">
+                    <span className="text-slate-900 dark:text-white font-bold tabular-nums shrink-0">
                       {orderedMatch[1]}
                     </span>
                     <div className="flex-1">{renderInlineMarkdown(orderedMatch[2], isOnlyLink)}</div>
@@ -256,8 +256,10 @@ function SafeMarkdownView({ content }: { content: string }) {
               const optionMatch = trimmed.match(/^([أبجدهـA-Da-d][.)]|[(][أبجدهـA-Da-d][)])\s+(.*)$/);
               if (optionMatch) {
                 return (
-                  <div key={lIdx} className="flex items-start gap-2 ps-6 text-slate-700">
-                    <span className="font-bold text-slate-800 shrink-0">{optionMatch[1]}</span>
+                  <div key={lIdx} className="flex items-start gap-2 ps-6 text-slate-700 dark:text-slate-300">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 shrink-0">
+                      {optionMatch[1]}
+                    </span>
                     <div className="flex-1">{renderInlineMarkdown(optionMatch[2])}</div>
                   </div>
                 );
@@ -280,7 +282,7 @@ function SafeMarkdownView({ content }: { content: string }) {
           {codeMatches[bIdx] && (
             <pre
               dir="ltr"
-              className="rounded-xl bg-slate-900 text-slate-100 p-4 text-xs font-mono overflow-x-auto"
+              className="rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 text-slate-100 p-4 text-xs font-mono overflow-x-auto"
             >
               <code>{codeMatches[bIdx].replace(/^```[a-zA-Z]*\n?|```$/g, '')}</code>
             </pre>
@@ -319,7 +321,9 @@ export function AIToolsClient({ locale }: { locale: string }) {
   const voiceBaseInputRef = useRef('');
   const requiredCredits: 1 | 2 = attached ? 2 : 1;
   const hasInsufficientCredits = Boolean(user && profile && credits < requiredCredits);
-  const canSend = Boolean((input.trim() || attached) && !isLoading && !extractingFile);
+  const canSend = Boolean(
+    !isLoading && !extractingFile && (input.trim() || attached || hasInsufficientCredits)
+  );
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -538,7 +542,13 @@ export function AIToolsClient({ locale }: { locale: string }) {
       stopVoiceCapture();
     }
     const promptText = (customPrompt ?? input).trim();
-    if (!promptText && !attached) return;
+    if (!promptText && !attached) {
+      if (hasInsufficientCredits) {
+        setUpgradeCreditInfo({ available: credits, required: requiredCredits });
+        setShowUpgradeModal(true);
+      }
+      return;
+    }
 
     if (!user) {
       setError(
@@ -869,17 +879,20 @@ export function AIToolsClient({ locale }: { locale: string }) {
   };
 
   return (
-    <div dir="ltr" className="flex flex-col md:flex-row w-full bg-white min-h-[calc(100vh-4rem)]">
-      {/* Left Physical Bolt.new-style Chat Column */}
+    <div
+      dir="ltr"
+      className="flex flex-col md:flex-row w-full bg-white dark:bg-slate-950 min-h-[calc(100vh-4rem)]"
+    >
+      {/* Left Physical Chat Column */}
       <aside
         dir={contentDir}
-        className="h-[calc(100vh-4rem)] w-full md:w-[380px] shrink-0 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-white"
+        className="h-[calc(100vh-4rem)] w-full md:w-[380px] shrink-0 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900"
       >
         {/* Chat Column Top Bar */}
-        <div className="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
+        <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <h1 className="font-bold text-base text-slate-900 truncate">
+            <h1 className="font-bold text-base text-slate-900 dark:text-white truncate">
               {isArabic ? 'مساعد SA AI الذكي' : 'SA AI Studio'}
             </h1>
           </div>
@@ -888,16 +901,16 @@ export function AIToolsClient({ locale }: { locale: string }) {
             {user ? (
               <Link
                 href={`/${locale}/pricing`}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md tabular-nums hover:bg-amber-100"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-md tabular-nums hover:bg-amber-100 dark:hover:bg-amber-900/60"
               >
-                <Coins className="w-3.5 h-3.5 text-amber-600" />
+                <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                 <span>{credits}</span>
               </Link>
             ) : (
               <button
                 type="button"
                 onClick={() => void signInWithGoogle()}
-                className="text-xs font-semibold text-blue-700 hover:underline cursor-pointer"
+                className="text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline cursor-pointer"
               >
                 {isArabic ? 'تسجيل الدخول' : 'Sign In'}
               </button>
@@ -912,7 +925,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   setError(null);
                 }}
                 title={isArabic ? 'محادثة جديدة' : 'Clear chat'}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -924,13 +937,13 @@ export function AIToolsClient({ locale }: { locale: string }) {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="space-y-5 pt-2">
-              <div className="rounded-xl border border-slate-200 bg-gray-50 p-4 space-y-2">
-                <p className="text-base font-bold text-slate-900">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/60 p-4 space-y-2">
+                <p className="text-base font-bold text-slate-900 dark:text-white">
                   {isArabic
                     ? 'مرحباً بك في استوديو SA AI'
                     : 'Welcome to SA AI Studio'}
                 </p>
-                <p className="text-sm sm:text-base leading-relaxed text-slate-600">
+                <p className="text-sm sm:text-base leading-relaxed text-slate-600 dark:text-slate-300">
                   {isArabic
                     ? 'ارفع صورة (JPG, PNG, WebP) أو مستند (PDF, TXT) عبر زر + في الأسفل، أو اسأل عن أي أداة PDF وسيوجهك المساعد مباشرة إليها بسرعة فائقة بنموذج Gemini 2.5 Flash (1 نقطة للرسالة / 2 نقطة لتحليل PDF).'
                     : 'Attach an image (JPG, PNG, WebP) or document (PDF, TXT) via the + button below, or ask how to use any SA AI tool for instant guidance powered by Gemini 2.5 Flash (1 credit/msg, 2 credits/PDF).'}
@@ -938,7 +951,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
               </div>
 
               <div className="space-y-2.5">
-                <p className="text-base font-bold text-slate-700">
+                <p className="text-base font-bold text-slate-700 dark:text-slate-300">
                   {isArabic ? 'أوامر سريعة:' : 'Quick prompts:'}
                 </p>
                 <div className="grid grid-cols-1 gap-2.5">
@@ -947,7 +960,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                       key={qp}
                       type="button"
                       onClick={() => void handleSend(qp)}
-                      className="text-start px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50/40 text-base font-medium leading-relaxed text-slate-800 transition-colors cursor-pointer"
+                      className="text-start px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-950/30 text-base font-medium leading-relaxed text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
                     >
                       {qp}
                     </button>
@@ -964,10 +977,10 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 }}
                 className={`rounded-xl p-4 text-base font-medium leading-relaxed border transition-colors ${
                   m.role === 'user'
-                    ? 'bg-slate-900 text-white border-slate-900 ms-4'
+                    ? 'bg-slate-900 dark:bg-blue-600 text-white border-slate-900 dark:border-blue-600 ms-4'
                     : activeResult?.id === m.id
-                    ? 'bg-amber-50/60 text-slate-900 border-amber-300 me-3 cursor-pointer'
-                    : 'bg-gray-50 text-slate-900 border-slate-200 me-3 cursor-pointer hover:border-slate-300'
+                    ? 'bg-amber-50/60 dark:bg-amber-950/30 text-slate-900 dark:text-slate-100 border-amber-300 dark:border-amber-700 me-3 cursor-pointer'
+                    : 'bg-gray-50 dark:bg-slate-800/70 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700 me-3 cursor-pointer hover:border-slate-300 dark:hover:border-slate-600'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-1.5 opacity-75 text-xs font-semibold">
@@ -1042,10 +1055,10 @@ export function AIToolsClient({ locale }: { locale: string }) {
           )}
         </div>
 
-        {/* Google AI Studio-Style Composer with Subtle Credit Cost Bar */}
-        <div className="px-3 pt-2.5 pb-3 border-t border-slate-200 bg-white space-y-2">
+        {/* Google AI Studio-Style Composer with Animated Gradient Border */}
+        <div className="px-3 pt-2.5 pb-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
           {hasInsufficientCredits && (
-            <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 text-xs">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800/70 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 text-xs">
               <span className="font-semibold">
                 {isArabic
                   ? credits === 1 && requiredCredits === 2
@@ -1061,7 +1074,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   setUpgradeCreditInfo({ available: credits, required: requiredCredits });
                   setShowUpgradeModal(true);
                 }}
-                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold transition-colors whitespace-nowrap cursor-pointer"
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-amber-500 hover:bg-slate-800 dark:hover:bg-amber-400 text-white dark:text-slate-950 font-bold transition-colors whitespace-nowrap cursor-pointer"
               >
                 <span>{isArabic ? 'اشحن الآن' : 'Upgrade'}</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -1076,28 +1089,28 @@ export function AIToolsClient({ locale }: { locale: string }) {
           >
             <div className="sa-ai-composer-glow" aria-hidden="true" />
 
-            <div className="relative z-10 rounded-[24px] bg-white px-2.5 py-2 space-y-2">
+            <div className="relative z-10 rounded-[24px] bg-white dark:bg-slate-900 px-2.5 py-2 space-y-2">
               {/* Thumbnail / File Preview Before Send */}
               {attached && (
-                <div className="flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between gap-2.5 px-2.5 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2.5 min-w-0">
                     {attached.previewImageUrl ? (
                       <img
                         src={attached.previewImageUrl}
                         alt={attached.name}
                         referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                        className="w-10 h-10 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4 text-blue-600" />
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 truncate">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                         {attached.name}
                       </p>
-                      <p className="text-[11px] text-slate-500 tabular-nums">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
                         {(attached.size / 1024).toFixed(1)} KB
                         {attached.pageCount ? ` · ${attached.pageCount} pages` : ''}
                       </p>
@@ -1107,7 +1120,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     type="button"
                     onClick={() => setAttached(null)}
                     aria-label="Remove attachment"
-                    className="p-1.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
+                    className="p-1.5 rounded-full text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1142,10 +1155,10 @@ export function AIToolsClient({ locale }: { locale: string }) {
                       : 'Attach image (JPG, PNG, WebP) or file (PDF, TXT)'
                   }
                   aria-label={isArabic ? 'إرفاق ملف' : 'Attach file'}
-                  className="w-10 h-10 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  className="w-10 h-10 rounded-full text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center shrink-0 transition-colors cursor-pointer disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   {extractingFile ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
                   ) : (
                     <Plus className="w-5 h-5" />
                   )}
@@ -1173,7 +1186,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                       ? 'اسأل SA AI أو اطلب تحليل ملف...'
                       : 'Ask SA AI anything...'
                   }
-                  className="flex-1 min-h-[40px] max-h-[152px] resize-none border-0 bg-transparent px-1.5 py-2 text-sm sm:text-[15px] font-medium leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                  className="flex-1 min-h-[40px] max-h-[152px] resize-none border-0 bg-transparent px-1.5 py-2 text-sm sm:text-[15px] font-medium leading-6 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
                 />
 
                 {/* Right Side (Physical Right in both LTR & RTL): Voice Mic + Circular Upward Arrow Send */}
@@ -1203,8 +1216,8 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     }
                     className={`relative w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer disabled:opacity-45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       isListening
-                        ? 'bg-rose-50 text-rose-600 ring-2 ring-rose-500/40'
-                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                        ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 ring-2 ring-rose-500/40'
+                        : 'text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                     }`}
                   >
                     {isListening && (
@@ -1215,7 +1228,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     )}
                     <Mic
                       className={`w-[18px] h-[18px] relative z-10 ${
-                        isListening ? 'animate-pulse text-rose-600' : ''
+                        isListening ? 'animate-pulse text-rose-600 dark:text-rose-400' : ''
                       }`}
                     />
                   </button>
@@ -1227,10 +1240,10 @@ export function AIToolsClient({ locale }: { locale: string }) {
                     title={isArabic ? 'إرسال الرسالة' : 'Send prompt'}
                     className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       isLoading
-                        ? 'bg-slate-900 text-white cursor-wait'
+                        ? 'bg-slate-900 dark:bg-blue-600 text-white cursor-wait'
                         : canSend
-                        ? 'bg-slate-900 hover:bg-blue-600 text-white shadow-xs cursor-pointer active:scale-95'
-                        : 'bg-slate-200/80 text-slate-400 cursor-not-allowed'
+                        ? 'bg-slate-900 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shadow-xs cursor-pointer active:scale-95'
+                        : 'bg-slate-200/80 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                     }`}
                   >
                     {isLoading ? (
@@ -1245,9 +1258,9 @@ export function AIToolsClient({ locale }: { locale: string }) {
           </div>
 
           {/* Subtle Credit Cost & Voice Language Footer Below Input */}
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1.5 text-[11px] font-medium text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Coins className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span className="truncate">
                 {isArabic
                   ? 'التكلفة: 1 نقطة للرسالة | 2 نقطة لتحليل PDF'
@@ -1256,7 +1269,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
               {attached && (
                 <>
                   <span aria-hidden="true">·</span>
-                  <span className="font-semibold text-amber-700 tabular-nums whitespace-nowrap">
+                  <span className="font-semibold text-amber-700 dark:text-amber-400 tabular-nums whitespace-nowrap">
                     {isArabic ? 'هذا الإرسال: 2 نقطة' : 'This send: 2 credits'}
                   </span>
                 </>
@@ -1274,7 +1287,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   ? 'تبديل لغة الميكروفون (العربية / الإنجليزية)'
                   : 'Switch voice recognition language (ar-SA / en-US)'
               }
-              className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer tabular-nums whitespace-nowrap shrink-0"
+              className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer tabular-nums whitespace-nowrap shrink-0"
             >
               {speechLang === 'ar-SA' ? 'Voice: AR (ar-SA)' : 'Voice: EN (en-US)'}
             </button>
@@ -1285,30 +1298,30 @@ export function AIToolsClient({ locale }: { locale: string }) {
       {/* Wide Preview & AI Results Canvas */}
       <section
         dir={contentDir}
-        className="flex-1 h-[calc(100vh-4rem)] overflow-y-auto bg-gray-50 p-6 sm:p-8"
+        className="flex-1 h-[calc(100vh-4rem)] overflow-y-auto bg-gray-50 dark:bg-slate-950 p-6 sm:p-8"
       >
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Attached File Live Preview Card */}
           {attached && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                   {attached.kind === 'image' ? (
-                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                    <ImageIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   ) : (
-                    <FileText className="w-4 h-4 text-amber-600" />
+                    <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   )}
                   <span>
                     {isArabic ? `معاينة الملف: ${attached.name}` : `File Preview: ${attached.name}`}
                   </span>
                 </div>
-                <span className="text-xs text-slate-500 tabular-nums">
+                <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                   {(attached.size / 1024).toFixed(1)} KB
                 </span>
               </div>
 
               {attached.previewImageUrl && (
-                <div className="rounded-xl overflow-hidden border border-slate-200 bg-gray-50 max-h-72 flex items-center justify-center p-2">
+                <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 max-h-72 flex items-center justify-center p-2">
                   <img
                     src={attached.previewImageUrl}
                     alt={attached.name}
@@ -1319,7 +1332,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
               )}
 
               {attached.documentText && (
-                <div className="rounded-xl border border-slate-200 bg-gray-50 p-3.5 max-h-44 overflow-y-auto text-xs text-slate-700 whitespace-pre-wrap font-mono">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 p-3.5 max-h-44 overflow-y-auto text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap font-mono">
                   {attached.documentText.slice(0, 1800)}
                   {attached.documentText.length > 1800 ? '\n...' : ''}
                 </div>
@@ -1329,11 +1342,11 @@ export function AIToolsClient({ locale }: { locale: string }) {
 
           {/* Main AI Result Panel */}
           {activeResult ? (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-white">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" />
-                  <h2 className="font-bold text-base text-slate-900">
+                  <h2 className="font-bold text-base text-slate-900 dark:text-white">
                     {isArabic ? 'النتائج والمعاينة' : 'AI Analysis & Result'}
                   </h2>
                 </div>
@@ -1342,10 +1355,10 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   <button
                     type="button"
                     onClick={() => void handleCopy()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
                   >
                     {copied ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     ) : (
                       <Copy className="w-3.5 h-3.5" />
                     )}
@@ -1355,7 +1368,7 @@ export function AIToolsClient({ locale }: { locale: string }) {
                   <button
                     type="button"
                     onClick={() => void handleExportPdf()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-blue-600 hover:bg-slate-800 dark:hover:bg-blue-500 text-white text-xs font-semibold cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>{isArabic ? 'تصدير PDF' : 'Export PDF'}</span>
@@ -1367,25 +1380,25 @@ export function AIToolsClient({ locale }: { locale: string }) {
                 {activeResult.content ? (
                   <SafeMarkdownView content={activeResult.content} />
                 ) : (
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
                     <span>{isArabic ? 'جارٍ استقبال الرد...' : 'Receiving streamed response...'}</span>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 flex items-center justify-center mx-auto">
                 <Sparkles className="w-7 h-7 text-amber-500" />
               </div>
               <div className="max-w-lg mx-auto space-y-2">
-                <h2 className="text-xl font-bold text-slate-900">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   {isArabic
                     ? 'مساحة عرض النتائج والمعاينة'
                     : 'AI Preview & Results Workspace'}
                 </h2>
-                <p className="text-sm text-slate-600 leading-relaxed">
+                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                   {isArabic
                     ? 'ستظهر هنا معاينة الصور وملفات PDF المرفقة ونتائج التحليل والاختبارات وروابط الأدوات الفورية من Gemini 2.5 Flash مع إمكانية النسخ أو التصدير المباشر.'
                     : 'Attached images, PDF previews, structured analysis, exams, and direct tool action links from Gemini 2.5 Flash stream here live ready to copy or export.'}
